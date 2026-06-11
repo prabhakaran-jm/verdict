@@ -69,8 +69,10 @@ find_vol() {
   local c out
   for c in vol3 vol "$PY -m volatility3"; do
     out="$($c -h 2>&1 || true)"
+    # match "volatility" unspaced: `vol -h` only contains it via plugin names
+    # like volatility3.plugins.windows.pslist (same fix as binaries.py)
     case "${out,,}" in
-      *"volatility 3"*) echo "$c"; return 0 ;;
+      *volatility*) echo "$c"; return 0 ;;
     esac
   done
   return 1
