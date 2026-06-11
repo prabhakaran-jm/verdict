@@ -193,10 +193,12 @@ CAPABILITIES: tuple[Capability, ...] = (
             description="Volatility 3",
             groups=(
                 Group("volatility3", (
-                    _exe("vol3", ("vol3",), ("-h",), expect="volatility 3"),
-                    _exe("vol", ("vol",), ("-h",), expect="volatility 3"),
-                    _exe("vol.py", ("vol.py",), ("-h",), expect="volatility 3"),
-                    _pymodule("volatility3", ("-h",), expect="volatility 3"),
+                    # expect "volatility" (no space): `vol -h` shows the string
+                    # only via plugin names like "volatility3.plugins.windows…"
+                    _exe("vol3", ("vol3",), ("-h",), expect="volatility"),
+                    _exe("vol", ("vol",), ("-h",), expect="volatility"),
+                    _exe("vol.py", ("vol.py",), ("-h",), expect="volatility"),
+                    _pymodule("volatility3", ("-h",), expect="volatility"),
                 )),
             ),
             lead="volatility3",
@@ -463,8 +465,7 @@ def _check_group(group: Group) -> ProbeResult:
         failures.append(f"{cand.label}: {res.detail}")
     if len(failures) == 1:
         return ProbeResult(False, failures[0])
-    labels = ", ".join(c.label for c in group.candidates)
-    return ProbeResult(False, f"no candidate available (tried {labels})")
+    return ProbeResult(False, "no candidate available: " + "; ".join(failures))
 
 
 def check_tier(capability: str, tier: Tier) -> TierResult:
