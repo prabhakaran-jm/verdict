@@ -1,0 +1,34 @@
+# Run outputs - keep the directory, ignore every run
+runs/*
+!runs/.gitkeep
+
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.venv-*/
+.scratch-venv/
+
+# Datasets - evidence never goes in git
+cases/szechuan/
+cases/**/*.zip
+cases/**/*.E01
+cases/**/*.E0[2-9]
+cases/**/*.Ex0[0-9]
+cases/**/*.dd
+cases/**/*.raw
+cases/**/*.mem
+cases/**/*.vmem
+cases/**/*.pcap
+cases/**/*.pcapng
+
+# OS noise
+.DS_Store
+Thumbs.db

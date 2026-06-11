@@ -1,0 +1,7 @@
+# Dev on Windows, execution on the SIFT VM - never let CRLF reach a bash script.
+* text=auto
+*.sh text eol=lf
+*.py text
+*.md text
+*.toml text
+*.j2 text

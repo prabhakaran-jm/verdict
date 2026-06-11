@@ -1,0 +1,68 @@
+# Process Notes
+
+## /onboard
+
+- Project: FIND EVIL! hackathon (Devpost) — autonomous AI incident response agents on SANS SIFT Workstation via Protocol SIFT (MCP).
+- Hackathon window: April 15 – June 15, 2026. Learner started onboarding June 10, 2026 — roughly 5 days to deadline. Time pressure is a major constraint; scope must be aggressive but achievable.
+- Submission requires 8 components (repo, 5-min demo video, architecture diagram, written description, dataset documentation, accuracy report, try-it-out instructions, agent execution logs). Missing any one = elimination.
+- Judging criteria: autonomous execution quality (tiebreaker), IR accuracy, breadth/depth, constraint implementation (architectural vs prompt guardrails), audit trail quality, usability/docs.
+- Learner: AI/engineering side. Intermediate Python. Tools: Claude Code + Cursor. No DFIR background.
+- Learning goal: prize money, explicitly. Optimize against judging criteria, not pedagogy.
+- Creative sensibility: none surfaced — deferred with "you decide the project which wins." Wants decisive recommendations, not option menus.
+- Prior SDD experience: yes (informal at minimum). Calibrate /reflect to experienced level.
+- Energy/style: extremely terse, speed-focused — "don't want to chat a lot, decide quickly and get into building." All downstream commands should minimize questions, lead with recommendations, ask veto/approve.
+- Coach's preliminary direction flagged for /scope: purpose-built MCP server with typed forensic tools + self-correction loop (targets the architectural-guardrails and autonomous-execution criteria most teams will fumble). To be pressure-tested in /scope.
+- No deepening rounds applicable in /onboard.
+
+## /scope
+
+- Learner fully delegated: "I completely trust you for winning project, lets wrap the planning and get into action." Consistent with onboarding style (terse, speed-focused, veto/approve). Brain dump yielded no new raw material; coach compensated with research.
+- Coach ran the research beat solo: confirmed hackathon specifics from Devpost + SANS blog. Key discovery: baseline Protocol SIFT is a Claude Code config (skills + permission blocklist), NOT an MCP server — meaning its guardrails are prompt/permission-based. The judging criteria explicitly favor architectural constraints → custom typed MCP server is the wedge. /onboard's preliminary direction survived pressure-testing and got sharper.
+- Scoped project: **VERDICT** — autonomous DFIR agent, custom read-only typed MCP server (~12 tools), triage→verify→report loop, server-written append-only audit ledger, Szechuan Sauce dataset (disk + memory, published ground truth → enables the accuracy report).
+- Competitive intel: several public competitor repos exist, incl. AppliedIR/sift-mcp (Valhuntir, 11 packages, human-in-the-loop). Positioning: full autonomy + self-verification depth vs. their platform breadth.
+- Cuts made (no learner pushback, by delegation): live response/SIEM, multi-agent frameworks, web UI, pcap deep-dive, Linux/macOS, tool breadth, fine-tuning.
+- **Deepening rounds: 0.** Not offered as open-ended rounds — learner explicitly asked to wrap planning; coach noted the doc is veto-able instead. Risk logged: zero learner-sourced context means /prd and /spec must re-verify assumptions (hardware/VM, API budget, dataset availability) rather than assume.
+- **Active shaping: minimal by choice.** Learner's one steer was meta ("wrap planning, get to action") — they shaped pace, not content. Downstream commands should present decisions, not questions, but force explicit veto checkpoints on irreversible choices (dataset selection, architecture).
+
+## /prd
+
+- Style adaptation per profile: coach drafts precise behaviors and presents veto/approve checkpoints instead of open-ended interview. One checkpoint at a time.
+- Opened with the Day-1 reality check (VM hardware, API budget, dataset bandwidth) — the three facts /scope flagged that only the learner can verify, and the only PRD inputs that can't be coach-decided.
+- Checkpoint 1 answers: VM hardware OK, dataset download OK, **API budget = $50 hard**. Budget is the binding constraint → PRD must require per-run cost ceiling (~$5/full run), tool output caps, cumulative cost display, and a budget guard that degrades gracefully instead of dying mid-run. Testing strategy implication: phase-level dry runs, few full runs.
+- Checkpoint 2 (run behavior, incl. 30-min wall-clock target, budget guard degrade, retry-once tool resilience, append-as-you-go ledger survival): **approved without edits**, single word. Learner continues full delegation; flagged decision (30-min target vs unbounded) accepted as recommended.
+- Checkpoint 3 (artifacts: report.html structure w/ clickable ledger citations, ledger.jsonl event schema, accuracy-report.md honest-misses format): **approved without edits**. Flagged decision (refuted findings appendix-only, main table = reproducible-only) accepted as recommended.
+- Checkpoint 4 (edge cases: clean-evidence honest report, judge smoke case, API-outage graceful interrupt, conflicting-evidence-as-finding, oversized-output caps): **approved without edits**, incl. the half-day smoke-case cost. The smoke case doubles as the cheap test loop protecting the $50 budget.
+- Checkpoint 5 (scope line: 12-tool MVP, disk↔memory correlation as measurable requirement ≥1 dual-cited finding, deferred list, REFUTED-flip as named wow moment): **approved without edits**. All five checkpoints approved verbatim — full delegation held through the entire PRD interview.
+- **Deepening rounds: 0** — offered once per protocol, learner chose "proceed straight to the doc." Consistent with /scope. Net effect: PRD content is 100% coach-drafted, learner-ratified; the five-checkpoint structure substituted for open-ended depth.
+- **Active shaping: ratification-only, but informative.** The learner's only original contribution was the Checkpoint 1 facts — and the $50 budget answer materially reshaped the PRD (cost ticker, $5/run guard, smoke-case-as-test-loop all trace to it). Zero vetoes across 5 checkpoints with real flagged tradeoffs (30-min target, refuted-to-appendix, smoke-case build cost) — either genuine trust or low engagement; /build comprehension checks will reveal which.
+- vs. scope doc: PRD added (1) $5/run budget guard + cost ticker, (2) 30-min wall-clock target, (3) smoke case for judges (new — biggest addition), (4) honest-clean-report requirement, (5) conflicts-as-findings (anti-forensics), (6) graceful INTERRUPTED behavior, (7) disk↔memory correlation hardened to "≥1 dual-cited verified finding", (8) refuted-findings-in-appendix policy, (9) named wow moment (REFUTED flip). Nothing from scope was cut.
+- "What if" likeliest to have landed: the judge-won't-download-30GB smoke case (also the budget-protection mechanism). No surprise was voiced (all "Approve"), so logging by inference.
+- Scope guard: no creep to fight — coach pre-sorted, learner ratified. Deferred list extended with resume-runs and cross-case memory.
+- Note for /spec: deadline is June 15; planning consumed June 10–11, so the scope doc's 5-day build shape is now effectively 4 days — /spec and /checklist must compress D1–D5 accordingly. Day-1 go/no-go (dataset links/hashes, Volatility compatibility, ground-truth completeness) is the first checklist item; open questions #1–2 gate everything.
+
+## /spec
+
+- Style per profile: coach researches + proposes, learner vetoes/approves. Checkpoints, not open interview. 4 checkpoints, all approved verbatim ("Approve" ×4) — full delegation held, consistent with /scope and /prd.
+- Research beat run solo (web search + current Claude API reference): MCP Python SDK stable v1.27.2 (pin <2; v2 pre-alpha); Sonnet 4.6 $3/$15 vs Opus 4.8 $5/$25 per MTok → Sonnet both phases, ~$2.50–4.50/run inside the $5 guard (resolves PRD open question #3); EZ Tools run on Linux via .NET per official SANS guide but add a runtime dep → primary+fallback per tool in a Binary Matrix, validated by the Day-1 gate.
+- **Biggest technical decision: manual agentic loop on the raw anthropic SDK, NOT Claude Agent SDK.** Rationale tied directly to judging criteria: Agent SDK ships bash/file tools that must be disabled by config = permission-based guardrail (the Protocol SIFT weakness VERDICT attacks); manual loop = the API request contains only the 12 typed MCP tools. Learner approved without pushback.
+- Two design changes vs scope doc, both flagged explicitly and approved: (1) Plaso supertimeline dropped for bodyfile+mactime (log2timeline on 25–30GB = hours, breaks 30-min target); (2) prefetch+amcache merged into one `execution_evidence` tool. Tool count: 12 model-visible + `_log_event` control-plane tool (orchestrator-only, preserves single-writer ledger claim).
+- Smoke case designed (resolves PRD open question #5): loose sanitized artifacts (EVTX-ATTACK-SAMPLES + host-exported hive + prefetch), decoy = `mimikatz.exe` that is ASCII text → reproducible REFUTED flip via the triage-recall/verifier-precision split. cases/clean/ added as the honest-empty-report standing test.
+- PDF method resolved as attempt chain (chromium headless → wkhtmltopdf → manual print); deployment trivially local-only (SIFT VM), confirmed not asked as a separate question.
+- **Deepening rounds: 0** — offered once per protocol with named topics (triage prompt design, verifier replay edge cases, ATT&CK mapping, ledger schema); learner: "proceed straight to the spec." Coach compensated by folding two of those (ledger event schema, verifier replay drift) into the spec body + Open Issues anyway.
+- **Active shaping: ratification-only again.** Zero vetoes across 4 checkpoints including two real flagged tradeoffs (timeline swap, Agent SDK rejection). No technical ideas volunteered. /build comprehension checks remain the test of whether delegation = trust or disengagement.
+- Architecture self-review surfaced into spec Open Issues: Vol3 vs Server 2012 R2 DC memory (weakest link — fallback to desktop capture), EVTX-ATTACK-SAMPLES license check, effort/excerpt-cap calibration on smoke runs, verifier replay SHA drift handling.
+- Note for /checklist: deadline June 15, today June 11 → 4 build days. Day-1 gate (dataset + binaries + Vol3 + ground truth) is checklist item #1 and gates everything; smoke case is the dev loop; full Szechuan runs are scarce (6–8 at $5). Dev on Windows host, execution on SIFT VM — checklist must include VM setup + repo clone logistics.
+
+## /checklist
+
+- Style per profile: 4 veto/approve checkpoints (sequence, build mode+prefs, Devpost plan, checklist+gut-check), all approved verbatim — "Approve" ×4. Full delegation held through the entire planning chain (/scope, /prd, /spec, /checklist: zero vetoes total).
+- **Sequencing decisions (coach-proposed, learner-ratified):** (1) Day-1 go/no-go gate is item 2, immediately after scaffold — riskiest thing earliest (Vol3 vs DC memory, dataset links, binary matrix); 30GB download kicks off in item 1 to run in background. (2) Loose-artifact tools before image tools — smoke case is loose files, so the full pipeline (triage→verify→report) is proven end-to-end on pennies by ~Day 2 (items 7–9) before any 30GB-image work; image tools (item 10) slot in after, pre-de-risked by the gate. (3) Submission docs (12) before video (13) so the demo can reference them.
+- **Methodology: autonomous mode + verification + commit-per-item.** Rationale: learner daily-drives Claude Code/Cursor, goal is prize not pedagogy. Verification checkpoints placed at integration risk points: after items 2 (gate), 5 (tools+cases), 7 (first autonomous smoke run), 11 (Szechuan run). Comprehension checks + check-in cadence N/A (autonomous). Git: commit per item as revert points; push at checkpoints.
+- **13 items over 4 build days** (~3–4/day, June 15 pure buffer). Items are deliberately bigger than the 15–30min curriculum default — each is a 1–3hr subagent work package, the right grain for autonomous mode on a multi-day build. Flagged honestly in the gut-check; learner approved.
+- Items needing the learner physically are flagged ⚠ inline: 2 (VM gate), 7 (watch first run), 11 (Szechuan run + transcript capture), implicit in 13 (video). Fully-unattended autonomous was never possible for this project; checkpoints double as the human-needed moments.
+- **Submission planning:** story = GTG-1002 defender-mirror (from scope/PRD); wow = the REFUTED flip (smoke decoy makes it reproducible — also the page-top GIF); screenshots mapped to PRD epics (6 named shots in item 12); deployment = none by design (forensic binaries on SIFT VM; smoke case IS the judge's try-it-live, framed as a feature); video required (one of 8 components), item 13. GitHub: folder wasn't a git repo — coach verified `gh` authenticated (prabhakaran-jm, repo scope) directly rather than re-asking; item 1 creates+pushes the public Apache-2.0 repo.
+- Budget guardrail written into the checklist header: $50 total, smoke case as the dev loop, item 11 capped at 2–3 full runs.
+- **Deepening rounds: 0** — offered once per protocol (verification sharpening, hidden deps, item splits); learner: "approve" → straight to generation. Consistent with all prior commands.
+- **Active shaping: ratification-only, consistent to the end.** Learner shaped pace, never content; answered the one factual question (GitHub auth) implicitly by approving. The /build verification checkpoints are now the only remaining test of engagement vs. trust.
+- Estimated total build time: ~13 items × 1–3hr ≈ 20–30 working hours across June 11–14; June 15 buffer.
+
