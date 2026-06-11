@@ -25,7 +25,7 @@
   Acceptance: Public repo live with the scaffold; `pip install -e .` succeeds clean in a fresh venv; download started and progressing on the VM (`prd.md > Submission Package` — public Apache-2.0 repo).
   Verify: Open the `gh repo view --web` URL and confirm the repo is public with LICENSE visible; run `pip install -e .` and confirm exit 0; check download progress on the VM.
 
-- [ ] **2. Day-1 go/no-go gate (on the SIFT VM)** ⚠ learner at the VM
+- [x] **2. Day-1 go/no-go gate (on the SIFT VM)** ⚠ learner at the VM
   Spec ref: `spec.md > Open Issues` (#1–#3) + `spec.md > MCP Server > Forensic Binary Matrix` + `spec.md > Primary Dataset`
   What to build: `verdict_mcp/binaries.py` — the binary path map plus a `--check` mode that probes every Forensic Binary Matrix row (primary, then fallback) and prints a green/red table. Then run the gate on the VM: (a) every matrix row green or fallback noted; (b) Volatility 3 `windows.pslist` succeeds on **both** Szechuan memory captures (DC 2012 R2 is the known weak spot — if it fails, record the fallback: desktop capture for memory, DC via disk artifacts); (c) dataset hashes verify; (d) enumerate the published ground-truth facts into `docs/ground-truth.md` as the scoring base for item 11; (e) confirm EVTX-ATTACK-SAMPLES redistribution license for smoke artifacts (fallback: generate events on the Windows host). Record an explicit GO / PIVOT decision in `process-notes.md`.
   Acceptance: PRD Open Questions #1–2 resolved with evidence; every capability in `prd.md > Constrained Tooling` (tool coverage list) has a confirmed working binary; GO/PIVOT recorded.

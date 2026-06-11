@@ -66,3 +66,17 @@
 - **Active shaping: ratification-only, consistent to the end.** Learner shaped pace, never content; answered the one factual question (GitHub auth) implicitly by approving. The /build verification checkpoints are now the only remaining test of engagement vs. trust.
 - Estimated total build time: ~13 items × 1–3hr ≈ 20–30 working hours across June 11–14; June 15 buffer.
 
+## /build
+
+Autonomous mode. Orchestrator dispatches items to subagents; checkpoints after items 2, 5, 7, 11.
+
+### Checkpoint 1 (items 1–2) — June 11, 2026
+
+- **DAY1-GATE RESULT: GO** (learner ran `scripts/day1-gate.sh` on the SIFT VM): binary matrix PASS · dataset MD5s PASS · vol3 pslist DC01 (2012 R2) **PASS** · vol3 pslist DESKTOP **PASS**. The feared Vol3-vs-DC-memory weak spot (spec Open Issue #2) did not materialize — no PIVOT needed; both memory captures are usable. PRD Open Questions #1–2 resolved with evidence.
+- Item 1: public repo live (github.com/prabhakaran-jm/verdict), scaffold verified (`pip install -e .` clean), all 11 dataset URLs verified live (~13.5 GB; spec's case-page URL was dead — live page is dfirmadness.com/the-stolen-szechuan-sauce/). Only MD5s published; script verifies them + computes SHA-256s.
+- Item 2: binaries.py matrix checker + ground-truth.md (24 scorable rows) + day1-gate.sh. Ground truth re-verified live against the case page, official answers post, and memory-analysis tutorial; pinned coreupdater.exe (PID 3644), 02:21 UTC first logon, 02:27:49 service install, 02:35 lateral movement, C2 203.78.103.109, domain CITADEL. Two offline-drafted claims corrected: timezone is Mountain/UTC-6 (not Pacific), EVTX-ATTACK-SAMPLES is GPL-3.0 (not unlicensed) — smoke case still self-generates events to keep the repo cleanly Apache-2.0 (license-mixing avoidance, spec Open Issue #3 resolved).
+- SIFT VM reality vs. spec assumptions: EZ Tools (evtxecmd/mftecmd/recmd) ARE native at /usr/local/bin; Volatility 3 and yara were NOT preinstalled (pip/apt installed into the project venv; PEP 668 requires a venv on SIFT's Ubuntu); PECmd/AmcacheParser absent → execution capability on planned fallback (pyscca + RegRipper).
+- Two real bugs found by the gate and fixed: binaries.py and day1-gate.sh both probed for the literal string "volatility 3" — `vol -h` output only ever contains the unspaced "volatility3" (verified empirically by installing vol 2.28 locally). Lesson logged: don't duplicate probe logic across files.
+- Build-infra note: item 2's background subagent stalled without reporting, then repeatedly force-pushed identical-tree re-commits over the remote (3×, content verified identical each time, nothing lost). Mitigated with GitHub branch protection on main (force-pushes + deletion blocked). Remaining items dispatch as foreground subagents.
+- Learner engagement at checkpoint 1: high — ran every VM command, pasted full outputs, caught the venv/PEP-668 friction and the NO-GO states promptly. The delegation-vs-engagement question from planning is answered: engaged.
+
