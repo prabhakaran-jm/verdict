@@ -19,7 +19,7 @@
 
 ## Checklist
 
-- [ ] **1. Scaffold, GitHub repo, dataset download kickoff**
+- [x] **1. Scaffold, GitHub repo, dataset download kickoff**
   Spec ref: `spec.md > File Structure` + `spec.md > Runtime & Deployment`
   What to build: Full package skeleton exactly per the spec's file structure (`verdict/` orchestrator + `verdict_mcp/` server + `cases/` + `rules/` + `docs/`); `pyproject.toml` pinning anthropic, `mcp<2`, pydantic v2, rich, jinja2, typer; Apache-2.0 `LICENSE`; README stub (smoke-case-first layout, filled in item 12); `.gitignore` covering `runs/`, dataset paths, `.env`. `git init`, create **public** GitHub repo `verdict` via `gh` (account `prabhakaran-jm`, already authenticated), push. Write `scripts/get-dataset.sh` (Szechuan Sauce download URLs + SHA verification) and start the ~25–30GB download on the SIFT VM in the background so it runs while items 2–4 proceed.
   Acceptance: Public repo live with the scaffold; `pip install -e .` succeeds clean in a fresh venv; download started and progressing on the VM (`prd.md > Submission Package` — public Apache-2.0 repo).
