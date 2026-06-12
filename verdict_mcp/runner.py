@@ -87,6 +87,8 @@ class RunResult:
             "truncated": self.truncated,
             "output_path": self.output_rel,
             "output_sha256": self.output_sha256,
+            # The tool_result ledger seq - what record_finding cites.
+            "cite_seq": self.result_seq,
             "exit_code": self.exit_code,
             "is_error": self.is_error,
         }
@@ -203,6 +205,27 @@ class Runner:
             is_error=is_error, stderr_excerpt=stderr_excerpt, error=error,
             timed_out=timed_out, argv=tuple(argv),
         )
+
+    # ----------------------------------------------------------- test seam
+
+    def has_capability_override(self, capability: str) -> bool:
+        """True if an `extra_argv` prefix is registered for `capability`.
+
+        Tools consult this to keep their argv shape in sync with the test
+        stub instead of probing binaries.resolve() on hosts without the
+        real forensic binaries.
+        """
+        return capability in self._extra_argv
+
+    def add_capability_override(self, capability: str,
+                                argv: Sequence[str | Path]) -> None:
+        """Register/replace a fixed argv prefix after construction.
+
+        Mirrors the constructor's `extra_argv` test seam for harnesses that
+        receive an already-built AppContext (build_app constructs the Runner
+        internally). Test-only; production capabilities live in binaries.py.
+        """
+        self._extra_argv[capability] = tuple(str(part) for part in argv)
 
     # ---------------------------------------------------------------- helpers
 

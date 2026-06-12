@@ -66,6 +66,10 @@ class Ledger:
         self.run_id = run_id
         self.path = self.run_dir / LEDGER_FILENAME
         self._lock = threading.Lock()
+        # Minimal in-memory index seq -> event type, so record_finding can
+        # check that every cite references an existing tool_result line
+        # without re-reading the file (spec tool #12).
+        self._event_by_seq: dict[int, str] = {}
         # Run dirs are fresh per run (spec.md > Data Model > Run folder), but if
         # a ledger already exists we continue its seq rather than restart at 1.
         self._seq = self._last_seq_on_disk()
@@ -107,6 +111,7 @@ class Ledger:
             self._fh.write("\n")
             self._fh.flush()
             os.fsync(self._fh.fileno())
+            self._event_by_seq[self._seq] = event
             return self._seq
 
     # ----------------------------------------------------- typed conveniences
@@ -137,6 +142,15 @@ class Ledger:
         """Last assigned sequence number (0 before the first write)."""
         return self._seq
 
+    def event_type(self, seq: int) -> str | None:
+        """Event type written at `seq`, or None if no such line exists.
+
+        Backed by the in-memory index (populated on write and, for a
+        continued ledger, from the on-disk scan) - lets record_finding
+        validate that every cite references a real tool_result line.
+        """
+        return self._event_by_seq.get(seq)
+
     def close(self) -> None:
         with self._lock:
             if not self._fh.closed:
@@ -154,7 +168,8 @@ class Ledger:
         """Max seq in an existing ledger file (0 if absent/empty).
 
         Tolerates a torn final line - the file is valid JSONL up to the moment
-        a previous process died (prd.md > Audit Ledger).
+        a previous process died (prd.md > Audit Ledger). Also seeds the
+        seq -> event index from the surviving lines.
         """
         last = 0
         try:
@@ -164,11 +179,15 @@ class Ledger:
                     if not line:
                         continue
                     try:
-                        seq = json.loads(line).get("seq")
+                        rec = json.loads(line)
                     except json.JSONDecodeError:
                         continue  # torn line from a killed process
-                    if isinstance(seq, int) and seq > last:
-                        last = seq
+                    seq = rec.get("seq")
+                    if isinstance(seq, int):
+                        if isinstance(rec.get("event"), str):
+                            self._event_by_seq[seq] = rec["event"]
+                        if seq > last:
+                            last = seq
         except FileNotFoundError:
             return 0
         return last

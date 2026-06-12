@@ -10,7 +10,7 @@ Plain stdlib (no pytest). Exercises, on Windows or Linux:
      tool_called/tool_result ledger pair (filename seq == tool_called seq)
   5. runner error paths: nonzero exit and timeout -> is_error, ledgered
   6. character-safe UTF-8 truncation at the 8192-byte boundary
-  7. server skeleton: only _log_event registered; it writes through the ledger
+  7. server skeleton: _log_event control plane writes through the ledger
 
 Run:  python tests/foundation_check.py
 Prints PASS/FAIL per check; exits nonzero on any FAIL.
@@ -338,8 +338,10 @@ def check_server_skeleton() -> None:
         try:
             tools = asyncio.run(app.list_tools())
             names = [t.name for t in tools]
-            assert names == ["_log_event"], (
-                f"expected only _log_event registered in item 3, got {names}")
+            # Item 3 shipped only _log_event; items 4/10 register the model
+            # tools. The skeleton check cares that the control plane exists.
+            assert "_log_event" in names, (
+                f"_log_event control plane missing; registered: {names}")
 
             asyncio.run(app.call_tool("_log_event", {
                 "event": "api_usage",
@@ -388,7 +390,7 @@ def main() -> int:
          check_runner_errors),
         ("runner: character-safe UTF-8 excerpt truncation",
          check_excerpt_truncation),
-        ("server: _log_event only, writes through the single ledger writer",
+        ("server: _log_event control plane writes through the single ledger writer",
          check_server_skeleton),
     ]
     for name, fn in checks:

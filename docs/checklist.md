@@ -31,13 +31,13 @@
   Acceptance: PRD Open Questions #1–2 resolved with evidence; every capability in `prd.md > Constrained Tooling` (tool coverage list) has a confirmed working binary; GO/PIVOT recorded.
   Verify: Run `python -m verdict_mcp.binaries --check` on the VM and confirm all rows green/fallback; eyeball two successful pslist outputs; open `docs/ground-truth.md` and confirm the facts list is enumerable and scorable. **← VERIFICATION CHECKPOINT 1**
 
-- [ ] **3. MCP server foundation — ledger, pathguard, runner**
+- [x] **3. MCP server foundation — ledger, pathguard, runner**
   Spec ref: `spec.md > MCP Server` (Ledger writer · Path guard · Subprocess runner) + `spec.md > Architecture Overview`
   What to build: `ledger.py` — append-only `ledger.jsonl`, one JSON object per line, monotonic `seq`, UTC `ts`, `fsync` after every line, all event types from the spec schema; `pathguard.py` — resolve to real paths, reads only under `--case`, writes only under `--run`, violations return typed refusals and ledger `tool_rejected`; `runner.py` — single subprocess choke point: fixed executable paths from `binaries.py` (never from model input), `shell=False`, per-tool timeouts (default 120s, `mem_analyze` 600s), full output to `runs/<id>/outputs/<seq>_<tool>.*` with SHA-256 ledgered, 8KB excerpt returned; `server.py` FastMCP skeleton taking `--case`/`--run`, registering the `_log_event` control-plane tool (never exposed to the model).
   Acceptance: `prd.md > Audit Ledger` — server-only writer, seq+timestamp per line, written the moment events happen, intact if the process dies; `prd.md > Constrained Tooling` — malformed calls rejected with clear ledgered errors, path escapes refused.
   Verify: Run the foundation test script: a malformed tool call produces a `tool_rejected` ledger line; a read outside the case dir is refused; kill the server process mid-write and confirm `ledger.jsonl` is valid JSONL up to the kill.
 
-- [ ] **4. Loose-artifact + recording tools (8 of 13)**
+- [x] **4. Loose-artifact + recording tools (8 of 13)**
   Spec ref: `spec.md > MCP Server > Tool definitions` (#1 `evidence_inventory`, #5 `evtx_query`, #6 `registry_query`, #7 `execution_evidence`, #10 `yara_scan`, #11 `read_artifact`, #12 `record_finding`, #13 `record_verdict`)
   What to build: The eight tools that work on loose artifact files — everything the smoke case needs. Pydantic-validated params per spec (narrowing params required: `limit ≤500` on evtx, plugin enums on registry, `length ≤8KB` on read_artifact); `record_finding` validates `attack_id` against `T\d{4}(\.\d{3})?` and requires `cites` to reference existing `tool_result` seq numbers; `record_verdict` enum-validated. Wire all through runner/pathguard/ledger from item 3. Use fallback binaries where the item-2 gate dictated.
   Acceptance: `prd.md > Constrained Tooling` — typed validated params, rejections ledgered, output caps with full-output-plus-hash on disk; tools accept loose files (smoke case) per spec.
