@@ -49,7 +49,7 @@
   Acceptance: `prd.md > Judge Experience` — smoke case is a few MB with ≥1 planted findable indicator; clean case supports the honest-empty standing test; every smoke artifact readable by the item-4 tools.
   Verify: Run `evidence_inventory` against both case folders — every artifact classified and hashed; spot-check `evtx_query` finds the 7045 event, `registry_query` run_keys finds the Run-key, `read_artifact` on the decoy returns ASCII text. **← VERIFICATION CHECKPOINT 2**
 
-- [ ] **6. Orchestrator — CLI, case validation, MCP client, terminal UI**
+- [x] **6. Orchestrator — CLI, case validation, MCP client, terminal UI**
   Spec ref: `spec.md > Orchestrator > CLI & case validation (cli.py)` + `spec.md > Orchestrator > MCP client (mcp_client.py)` + `spec.md > Orchestrator > Terminal UI (terminal.py)`
   What to build: Typer CLI `verdict investigate <case_dir> [--budget 5.00] [--output runs/] [--model claude-sonnet-4-6]`; case validation (missing/empty folder → clear message, exit 1, nothing runs); `runs/<UTC-timestamp>/` creation (never overwrites a prior run); `mcp_client.py` spawns `verdict_mcp` over stdio, converts `list_tools()` schemas to Anthropic tool definitions (deterministic sorted serialization for cache stability), enforces phase allowlists as the double gate; `terminal.py` rich rendering — one line per tool call (timestamp, tool, args, duration, sha, cost), dimmed narration, persistent status bar (findings · elapsed · cost), verdict-flip rendering, completion summary table.
   Acceptance: `prd.md > Autonomous Investigation Run` — within ~10s of launch: case validated, evidence inventory table, stated plan; invalid folder exits nonzero immediately; re-runs get fresh folders.
