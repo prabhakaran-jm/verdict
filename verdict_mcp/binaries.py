@@ -378,17 +378,25 @@ def _run_probe(argv: tuple[str, ...]) -> tuple[bool, int, str, str]:
     return True, proc.returncode, (proc.stdout or "") + (proc.stderr or ""), ""
 
 
-def _evaluate(argv: tuple[str, ...], expect: str, where: str) -> ProbeResult:
+def _evaluate(argv: tuple[str, ...], expect: str, where: str,
+              prefix: tuple[str, ...] | None = None) -> ProbeResult:
+    """Run a probe. On success the ProbeResult carries `prefix` — the
+    execution argv WITHOUT probe args like -h/--version — because resolve()
+    hands that argv to the runner for real invocations. Storing the full
+    probe argv here once sent `evtx_dump --version -o jsonl …` to every
+    real call (the binary short-circuited on --version and emitted only
+    its banner)."""
     ran, rc, out, reason = _run_probe(argv)
     if not ran:
         return ProbeResult(False, reason)
+    exec_argv = tuple(prefix) if prefix is not None else argv
     if expect:
         if expect.lower() in out.lower():
-            return ProbeResult(True, where, argv=argv)
+            return ProbeResult(True, where, argv=exec_argv)
         return ProbeResult(False, f"{where}: probe output lacked '{expect}'"
                                   f" (exit {rc})")
     if rc == 0:
-        return ProbeResult(True, where, argv=argv)
+        return ProbeResult(True, where, argv=exec_argv)
     return ProbeResult(False, f"{where}: probe exited {rc}")
 
 
@@ -408,7 +416,8 @@ def _probe_candidate_uncached(cand: Candidate) -> ProbeResult:
             path = _which(name)
             if path is None:
                 continue
-            res = _evaluate((path, *cand.probe_args), cand.expect, path)
+            res = _evaluate((path, *cand.probe_args), cand.expect, path,
+                            prefix=(path,))
             if res.ok:
                 return res
             last_fail = res  # keep trying other names; remember why this failed
@@ -437,7 +446,7 @@ def _probe_candidate_uncached(cand: Candidate) -> ProbeResult:
             return ProbeResult(False, f"{cand.dll} not found under EZ Tools dirs "
                                       f"({dirs}; set $VERDICT_EZTOOLS_DIR)")
         return _evaluate((dotnet, str(dll_path), *cand.probe_args), cand.expect,
-                         f"dotnet {dll_path}")
+                         f"dotnet {dll_path}", prefix=(dotnet, str(dll_path)))
 
     if cand.kind == "pymodule":
         if cand.library_only:
@@ -451,7 +460,7 @@ def _probe_candidate_uncached(cand: Candidate) -> ProbeResult:
                                       f"importable: {why}")
         argv = (sys.executable, "-m", cand.module)
         return _evaluate((*argv, *cand.probe_args), cand.expect,
-                         f"{sys.executable} -m {cand.module}")
+                         f"{sys.executable} -m {cand.module}", prefix=argv)
 
     return ProbeResult(False, f"unknown candidate kind '{cand.kind}'")
 

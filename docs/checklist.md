@@ -43,7 +43,7 @@
   Acceptance: `prd.md > Constrained Tooling` — typed validated params, rejections ledgered, output caps with full-output-plus-hash on disk; tools accept loose files (smoke case) per spec.
   Verify: Against a scratch folder of sample artifacts, call each tool once via a test harness: confirm sensible output, a `tool_called`/`tool_result` ledger pair per call, and one deliberately malformed call per tool rejected cleanly.
 
-- [ ] **5. Smoke case + clean case construction**
+- [x] **5. Smoke case + clean case construction**
   Spec ref: `spec.md > Smoke Case (cases/smoke/)` + `spec.md > Smoke Case > Clean case (cases/clean/)`
   What to build: `cases/smoke/` (a few MB, loose sanitized artifacts): small Security/System EVTX with type-3 logons + 7045 service install (EVTX-ATTACK-SAMPLES picks per the item-2 license check, else host-generated); registry hive with Run-key → `C:\Users\Public\update.exe` (exported from the Windows host); matching renamed prefetch `.pf` (execution evidence → enables the dual-source finding); benign file matching a custom EICAR-style YARA rule in `rules/`; **the decoy: `mimikatz.exe` containing 12 bytes of ASCII text** — the reproducible REFUTED flip. `cases/clean/`: a handful of benign artifacts. Document both in `docs/dataset.md` (smoke provenance section).
   Acceptance: `prd.md > Judge Experience` — smoke case is a few MB with ≥1 planted findable indicator; clean case supports the honest-empty standing test; every smoke artifact readable by the item-4 tools.

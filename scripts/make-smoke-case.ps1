@@ -173,7 +173,9 @@ try {
 
     # --------------------------------------------- STEP 2: type-3 logons
     Write-Step "2. Generate type-3 (network) logons via a throwaway local user"
-    $Password = 'Vs#' + ([System.Guid]::NewGuid().ToString('N').Substring(0,16)) + 'Zq9!'
+    # <= 14 chars: longer passwords make net.exe block on an interactive
+    # "longer than 14 characters, continue? (Y/N)" prompt.
+    $Password = 'V#' + ([System.Guid]::NewGuid().ToString('N').Substring(0,8)) + '9q!'
     Write-Do "net user $UserName <random-password> /add  (no admin groups)"
     & net.exe user $UserName $Password /add > $null 2>&1
     if ($LASTEXITCODE -ne 0) {
@@ -209,6 +211,11 @@ try {
 
     # ---------------------------------------------- STEP 4: export filtered logs
     Write-Step "4. Export time-window-filtered event logs (never the whole log)"
+    # Event-log writes commit asynchronously: the 7045 from step 3 can land in
+    # the log a moment AFTER sc.exe returns. Without this pause the export
+    # races the flush and captures nothing (observed in the first full run).
+    Write-Do "waiting 3s for event-log flush (7045 commit races sc.exe exit)"
+    Start-Sleep -Seconds 3
     $secQuery = "*[System[(EventID=4624 or EventID=4625) and TimeCreated[@SystemTime>='$T0Iso']]]"
     $sysQuery = "*[System[(EventID=7045) and TimeCreated[@SystemTime>='$T0Iso']]]"
 
