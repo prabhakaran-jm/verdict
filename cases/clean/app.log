@@ -1,0 +1,8 @@
+2026-05-02 08:00:01 INFO  inventory-tool starting up (v2.3.1)
+2026-05-02 08:00:01 INFO  loaded configuration from config.ini
+2026-05-02 08:00:02 INFO  connected to local catalog database
+2026-05-02 08:14:37 INFO  nightly stock reconciliation complete: 1184 SKUs
+2026-05-02 09:02:11 INFO  user 'msmith' opened the reorder report
+2026-05-02 09:48:55 WARN  vendor feed slow to respond (1820 ms); retried OK
+2026-05-02 12:30:00 INFO  scheduled backup written to D:\backups\catalog.bak
+2026-05-02 17:59:42 INFO  inventory-tool shutting down cleanly

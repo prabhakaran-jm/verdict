@@ -1,0 +1,24 @@
+INVOICE
+Acme Office Supplies Ltd.
+Invoice #: 2020-04817
+Date: 2020-11-03
+
+Bill to: Northwind Trading Co.
+
+  Qty  Description                 Unit      Amount
+  ----  -------------------------  --------  --------
+   12  A4 copier paper (ream)      $4.20     $50.40
+    4  Black toner cartridge       $61.00    $244.00
+    1  Standing desk mat           $38.50     $38.50
+
+                              Subtotal       $332.90
+                              Tax (8.25%)     $27.46
+                              Total          $360.36
+
+Payment due within 30 days. Thank you for your business.
+
+---
+This is a benign document used as a YARA positive-control fixture for the
+VERDICT smoke case. The token below is an inert, author-generated test
+marker (see rules/smoke.yar) - it is not malware and contains no payload:
+VERDICT-SMOKE-TEST-MARKER-2b9f4e7a1c6d8035e4

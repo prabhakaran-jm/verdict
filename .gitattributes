@@ -5,3 +5,15 @@
 *.md text
 *.toml text
 *.j2 text
+
+# The elevated host script is authored and run on Windows - keep it CRLF.
+*.ps1 text eol=crlf
+
+# Smoke/clean case artifacts are byte-exact forensic fixtures. With
+# core.autocrlf=true a line-ending rewrite would change file sizes and
+# corrupt binaries, so disable all conversion for them. This keeps the
+# 12-byte mimikatz.exe decoy exactly 12 bytes on every checkout, and keeps
+# the host-exported Security.evtx/System.evtx/NTUSER.DAT/UPDATE.EXE-*.pf
+# binaries (committed later) intact.
+cases/smoke/* -text
+cases/clean/* -text
