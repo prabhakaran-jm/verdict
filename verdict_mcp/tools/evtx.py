@@ -46,6 +46,35 @@ MAX_LIMIT = 500
 RECORD_DATA_CAP = 1024
 
 
+def _evtxecmd_event_data(payload: Any) -> Any:
+    """EvtxECmd stores event data as an escaped JSON STRING shaped
+    {"EventData": {"Data": [{"@Name": "LogonType", "#text": "3"}, ...]}}.
+    Flatten that name/value list into a plain {name: text} dict so fields
+    like LogonType / ImagePath are directly addressable in the record we
+    hand the model and cite against (and so they survive the data cap -
+    the flattened form is far more compact than the raw @Name/#text list)."""
+    if not isinstance(payload, str):
+        return payload
+    try:
+        parsed = json.loads(payload)
+    except json.JSONDecodeError:
+        return payload
+    event_data = parsed.get("EventData") if isinstance(parsed, dict) else None
+    inner = event_data.get("Data") if isinstance(event_data, dict) else None
+    if isinstance(inner, dict):  # single element, not a list
+        inner = [inner]
+    if isinstance(inner, list):
+        flat: dict[str, Any] = {}
+        for item in inner:
+            if isinstance(item, dict) and "@Name" in item:
+                flat[item["@Name"]] = item.get("#text")
+            elif item is not None:
+                flat.setdefault("_unnamed", []).append(item)
+        if flat:
+            return flat
+    return parsed
+
+
 def _normalize(raw: dict[str, Any]) -> dict[str, Any]:
     """Compact, shape-agnostic record: handles both evtx_dump's nested
     {"Event": {"System": ..., "EventData": ...}} and EvtxECmd's flat maps."""
@@ -67,17 +96,13 @@ def _normalize(raw: dict[str, Any]) -> dict[str, Any]:
         event_id = raw.get("EventId", raw.get("EventID"))
         when = raw.get("TimeCreated")
         provider = raw.get("Provider")
-        data = raw.get("Payload")
-        if isinstance(data, str):
-            try:
-                data = json.loads(data)
-            except json.JSONDecodeError:
-                pass
+        data = _evtxecmd_event_data(raw.get("Payload"))
         extras = {key: raw[key] for key in
                   ("MapDescription", "UserName", "ExecutableInfo")
                   if raw.get(key)}
         if extras:
-            data = {"payload": data, **extras} if data else extras
+            data = {**extras, **data} if isinstance(data, dict) \
+                else {"payload": data, **extras}
         system = raw  # Channel/Computer live at the top level here
 
     try:
@@ -154,7 +179,10 @@ def register(app: "FastMCP", ctx: "AppContext") -> None:
         parse_errors = 0
         wanted_ids = set(event_ids) if event_ids else None
         needle = keyword.lower() if keyword else None
-        for line in source.read_text(encoding="utf-8",
+        # utf-8-sig strips EvtxECmd's leading BOM (else record 1 fails to
+        # parse - fatal when a log has a single record, e.g. the 7045);
+        # harmless for the evtx_dump fallback, which emits no BOM.
+        for line in source.read_text(encoding="utf-8-sig",
                                      errors="replace").splitlines():
             line = line.strip()
             if not line:
