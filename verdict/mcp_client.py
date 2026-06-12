@@ -246,6 +246,28 @@ class MCPClient:
         for an Anthropic tool_result block. The server independently enforces
         the same allowlist plus path/param constraints - this is the
         orchestrator-side half of the double gate.
+
+        Convenience over call_tool_result(): returns just the string. Use
+        call_tool_result() when the agent loop needs the is_error flag for
+        retry/route-around logic.
+        """
+        text, _is_error = await self.call_tool_result(name, arguments)
+        return text
+
+    async def call_tool_result(
+        self, name: str, arguments: dict[str, Any] | None = None,
+    ) -> tuple[str, bool]:
+        """Double gate -> session.call_tool -> (stringified content, is_error).
+
+        Same gate and stringification as call_tool(), but ALSO surfaces the
+        server's rejection/error flag (spec.md > MCP client; checklist item 7).
+        Over stdio a server ToolError comes back as CallToolResult(isError=True)
+        whose content is the error text - the SDK does NOT raise client-side
+        (see tests/orchestrator_check.py: check_phase_gate_double). The agent
+        loop needs that flag to retry once then route around a failed tool call
+        (spec.md > Failure & Empty-Case Behavior); the model also gets the flag
+        on its tool_result block. A PhaseRefusal still raises (caller-side
+        programming/hallucination, not a server outcome).
         """
         if self._session is None:
             raise RuntimeError("MCPClient is not connected (use 'async with')")
@@ -261,7 +283,30 @@ class MCPClient:
                 f"{', '.join(sorted(self._allowed_names())) or '(none)'}"
             )
         result = await self._session.call_tool(name, arguments or {})
-        return self._stringify_result(result)
+        is_error = bool(getattr(result, "isError", False))
+        return self._stringify_result(result), is_error
+
+    async def log_event(self, event: str, payload: dict[str, Any] | None = None) -> int:
+        """Write one orchestrator-side event through the server's `_log_event`.
+
+        Control-plane channel (spec.md > Key Technical Decisions #4): the
+        orchestrator's own events (run_started / api_usage / budget_event /
+        run_interrupted / run_ended) reach the single server-written ledger
+        through `_log_event`, which is NEVER in the model's tool list. This
+        BYPASSES the phase gate on purpose - it is control-plane, not
+        model-facing, so set_phase() does not apply. Returns the assigned ledger
+        seq. The server validates the event type; an unknown event raises.
+        """
+        if self._session is None:
+            raise RuntimeError("MCPClient is not connected (use 'async with')")
+        result = await self._session.call_tool(
+            "_log_event", {"event": event, "payload": payload or {}})
+        if getattr(result, "isError", False):
+            raise RuntimeError(
+                f"_log_event('{event}') was refused by the server: "
+                f"{self._stringify_result(result)}")
+        structured = getattr(result, "structuredContent", None) or {}
+        return int(structured.get("seq", 0))
 
     @staticmethod
     def _stringify_result(result: Any) -> str:

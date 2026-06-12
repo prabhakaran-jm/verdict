@@ -27,9 +27,14 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import typer
 
+from verdict.agent.loop import DEFAULT_EFFORT, LoopConfig, LoopInterrupted
+from verdict.agent.triage import run_triage
+from verdict.budget import BudgetGuard
+from verdict.findings import FindingsStore
 from verdict.mcp_client import MCPClient
 from verdict.terminal import TerminalUI
 
@@ -70,6 +75,42 @@ class CaseValidationError(Exception):
     exiting 1 - nothing else runs (no run folder, no server spawn). The agent
     loop (item 7) never sees an invalid case (spec.md > CLI & case validation).
     """
+
+
+class ConfigError(Exception):
+    """A precondition for the run is missing (e.g. no ANTHROPIC_API_KEY).
+
+    Carries a clear, human-readable message the CLI prints to stderr before
+    exiting nonzero - never a traceback. The autonomous run needs an API key;
+    we detect its absence up front and say exactly what to set (checklist item
+    7: a no-key run fails gracefully, not with a crash).
+    """
+
+
+def build_anthropic_client(model: str):
+    """Construct the AsyncAnthropic client, lazily, with a clear no-key error.
+
+    Imported lazily so the package imports (and the fake-client tests) run with
+    no `anthropic` key and no real API calls - the $0 dev/test constraint. A
+    missing ANTHROPIC_API_KEY raises ConfigError with a plain message instead of
+    the SDK's own exception, so the CLI exits cleanly rather than dumping a
+    traceback.
+    """
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        raise ConfigError(
+            "ANTHROPIC_API_KEY is not set. VERDICT runs Claude autonomously and "
+            "needs an API key. Set it and re-run, e.g.:\n"
+            "  export ANTHROPIC_API_KEY=sk-ant-...   (Linux/macOS)\n"
+            "  $env:ANTHROPIC_API_KEY = 'sk-ant-...'  (PowerShell)"
+        )
+    try:
+        from anthropic import AsyncAnthropic
+    except ImportError as exc:  # pragma: no cover - anthropic is a hard dep
+        raise ConfigError(
+            f"the 'anthropic' package is not installed ({exc}); run "
+            f"`pip install -e .` to install dependencies."
+        ) from exc
+    return AsyncAnthropic()
 
 
 # --------------------------------------------------------------- validation
@@ -172,18 +213,30 @@ def create_run_dir(output_parent: str | Path) -> Path:
 # ----------------------------------------------------------- survey flow
 
 
-async def _survey(case_dir: Path, run_dir: Path, ui: TerminalUI,
-                  budget: float, model: str) -> None:
-    """Spawn the server, run evidence_inventory, render inventory + plan.
+async def _run_investigation(
+    case_dir: Path, run_dir: Path, ui: TerminalUI, budget: float, model: str,
+    *, anthropic_client: Any, client: MCPClient | None = None,
+) -> bool:
+    """Survey -> triage -> [verify seam] -> [report seam] -> completion summary.
 
-    This is the item-6 survey-and-exit flow. The agent loop (item 7) inserts
-    at the marked seam after the plan is stated. We set the triage phase (the
-    only phase where evidence_inventory is allowed) and call it through the
-    double-gated client, then render the result with terminal.py.
+    Drives the whole autonomous run on one event loop (spec.md > Stack: async
+    throughout). `client` lets tests inject a connected MCPClient against the
+    real server subprocess; in production we open one here. `anthropic_client`
+    is the AsyncAnthropic client (or a fake, in the $0 tests). Returns True on a
+    clean completion; raises LoopInterrupted on a sustained API outage so the
+    caller writes a partial report and exits 2.
     """
-    async with MCPClient(case_dir, run_dir) as client:
+    owns_client = client is None
+    if owns_client:
+        client = await MCPClient(case_dir, run_dir).__aenter__()
+    try:
         client.set_phase("triage")  # evidence_inventory is triage-only (tool #1)
 
+        # run_started through the control plane (server is the single writer).
+        await _safe_log_event(client, "run_started", {
+            "case_dir": str(case_dir), "budget_usd": budget, "model": model})
+
+        # --- survey: evidence_inventory -> render inventory + plan (~10s AC).
         raw = await client.call_tool("evidence_inventory", {})
         inventory = json.loads(raw)
         ui.inventory_table(
@@ -191,24 +244,80 @@ async def _survey(case_dir: Path, run_dir: Path, ui: TerminalUI,
             case_dir=inventory.get("case_dir", str(case_dir)),
             counts=inventory.get("counts"),
         )
-
-        # Stated investigation plan within ~10s (prd.md > Autonomous
-        # Investigation Run). Static placeholder is fine for item 6; the triage
-        # agent will state a real, kill-chain-shaped plan in item 7.
         ui.plan(
             "triage across the kill chain (initial access -> persistence -> "
             "lateral movement -> C2), then adversarially verify every finding, "
             f"then write the report. Budget ${budget:.2f}, model {model}."
         )
 
+        budget_guard = BudgetGuard(budget)
+        findings_store = FindingsStore(run_dir)
+        config = LoopConfig(model=model, effort=DEFAULT_EFFORT)
+
+        ui.start_status()
+        ui.update_status(findings=0, cost_usd=0.0)
+
+        # --- TRIAGE (item 7): the real agentic loop, driven by anthropic_client.
+        try:
+            await run_triage(
+                anthropic_client, client,
+                inventory_json=raw,
+                budget_guard=budget_guard,
+                findings_store=findings_store,
+                terminal_ui=ui,
+                config=config,
+            )
+        except LoopInterrupted as exc:
+            await _safe_log_event(client, "run_interrupted",
+                                  {"reason": str(exc)})
+            ui.narration(f"INTERRUPTED: {exc}")
+            raise
+        finally:
+            ui.update_status(cost_usd=budget_guard.total_cost)
+
         # ---------------------------------------------------------------
-        # AGENT LOOP GOES HERE (item 7)
-        # The triage loop, budget guard (budget.py), findings store
-        # (findings.py), verifier pass (item 8), and report generation (item 9)
-        # slot in here, driving `client` (already phase-gated) and `ui`
-        # (tool_line / narration / update_status / verdict_flip / summary_table).
-        # Item 6 stops after the survey + stated plan.
+        # VERIFIER PASS GOES HERE (item 8)
+        #   Fresh-context per-finding adversarial pass over findings_store, set
+        #   phase "verify", reuse loop.run_phase with VERIFIER_SYSTEM and the
+        #   verify sub-budget (budget_guard.verify_cap()). Each verdict ->
+        #   findings_store.set_verdict(...) + ui.verdict_flip(...). The loop,
+        #   budget guard, findings store, and prompts seam are all ready.
         # ---------------------------------------------------------------
+
+        # ---------------------------------------------------------------
+        # REPORT GENERATION GOES HERE (item 9)
+        #   One Sonnet call (REPORT_PROSE_SYSTEM) over the VERIFIED/UNCONFIRMED
+        #   findings -> report.html/pdf, reserving budget_guard.report_reserve().
+        #   budget_guard.notes carries any graceful-degradation lines for the
+        #   report. The ledger.jsonl + findings.json are already on disk.
+        # ---------------------------------------------------------------
+
+        # --- completion summary (severity-sorted findings + artifact paths).
+        ui.summary_table(
+            findings_store.findings,
+            artifacts={
+                "findings.json": str(findings_store.path),
+                "ledger.jsonl": str(run_dir / "ledger.jsonl"),
+            },
+        )
+        await _safe_log_event(client, "run_ended", {
+            "findings": len(findings_store),
+            "total_cost_usd": round(budget_guard.total_cost, 6),
+        })
+        return True
+    finally:
+        ui.stop_status()
+        if owns_client:
+            await client.__aexit__(None, None, None)
+
+
+async def _safe_log_event(client: MCPClient, event: str,
+                          payload: dict[str, Any]) -> None:
+    """Control-plane ledger write that never crashes the run on failure."""
+    try:
+        await client.log_event(event, payload)
+    except Exception:  # noqa: BLE001 - ledger is convenience at the CLI edge
+        pass
 
 
 # --------------------------------------------------------------- command
@@ -237,7 +346,17 @@ def investigate(
         typer.echo(f"verdict: {exc}", err=True)
         raise typer.Exit(code=EXIT_INVALID_CASE)
 
-    # 2. Create the run folder (never overwrites a prior trail).
+    # 2. Build the Anthropic client up front - a missing ANTHROPIC_API_KEY is a
+    #    clean, plain-English failure with a nonzero exit, NOT a traceback, and
+    #    NOT a littered empty run folder (checklist item 7). Done before the run
+    #    folder so a misconfigured host fails fast.
+    try:
+        anthropic_client = build_anthropic_client(model)
+    except ConfigError as exc:
+        typer.echo(f"verdict: {exc}", err=True)
+        raise typer.Exit(code=EXIT_INTERNAL)
+
+    # 3. Create the run folder (never overwrites a prior trail).
     try:
         run_dir = create_run_dir(output)
     except OSError as exc:
@@ -249,11 +368,21 @@ def investigate(
     ui.console.print(f"Case validated: {case}")
     ui.console.print(f"Run folder: {run_dir}")
 
-    # 3-6. Spawn server -> evidence_inventory -> render inventory + plan ->
-    #      clean shutdown -> exit 0. KeyboardInterrupt -> exit 2; anything else
-    #      -> exit 3 (spec.md > Runtime & Deployment exit codes).
+    # 4. Spawn server -> survey -> triage -> [verify/report seams] -> summary ->
+    #    clean shutdown -> exit 0. LoopInterrupted (API outage) -> exit 2 with a
+    #    partial report from existing findings; KeyboardInterrupt -> exit 2;
+    #    anything else -> exit 3 (spec.md > Runtime & Deployment exit codes).
     try:
-        asyncio.run(_survey(case, run_dir, ui, budget, model))
+        asyncio.run(_run_investigation(
+            case, run_dir, ui, budget, model,
+            anthropic_client=anthropic_client))
+    except LoopInterrupted as exc:
+        typer.echo(
+            f"verdict: interrupted - the Anthropic API was unavailable. A "
+            f"partial trail (ledger.jsonl, findings.json) is in {run_dir}. "
+            f"Recover by re-running (a fresh run folder, never a resume). "
+            f"Details: {exc}", err=True)
+        raise typer.Exit(code=EXIT_INTERRUPTED)
     except KeyboardInterrupt:
         typer.echo("verdict: interrupted", err=True)
         raise typer.Exit(code=EXIT_INTERRUPTED)
