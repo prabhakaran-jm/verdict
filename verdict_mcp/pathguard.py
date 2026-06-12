@@ -61,13 +61,28 @@ class PathGuard:
         self.case_dir = Path(case_dir).resolve()
         self.run_dir = Path(run_dir).resolve()
 
+    def _anchor(self, path: str | Path, *roots: Path) -> str | Path:
+        """Anchor a relative `path` at the first root where it exists (else
+        the first root), so model-supplied paths copied from the evidence
+        inventory ("System.evtx") resolve against the case dir — never the
+        server process CWD. Absolute paths pass through untouched."""
+        p = Path(path)
+        if p.is_absolute():
+            return path
+        for root in roots:
+            if (root / p).exists():
+                return root / p
+        return roots[0] / p
+
     def resolve_read(self, path: str | Path, param: str = "path") -> Path:
         """Resolve `path` and require it under the case dir or the run dir.
 
-        Returns the resolved absolute Path on success; raises PathViolation
-        otherwise. Call this on EVERY model-supplied path before any read.
+        Relative paths are anchored at the case dir (falling back to the run
+        dir if the file only exists there). Returns the resolved absolute
+        Path on success; raises PathViolation otherwise. Call this on EVERY
+        model-supplied path before any read.
         """
-        resolved = _resolve(path)
+        resolved = _resolve(self._anchor(path, self.case_dir, self.run_dir))
         if _is_within(resolved, self.case_dir) or _is_within(resolved, self.run_dir):
             return resolved
         raise PathViolation(
@@ -80,10 +95,11 @@ class PathGuard:
     def resolve_write(self, path: str | Path, param: str = "path") -> Path:
         """Resolve `path` and require it under the run dir (the only write root).
 
-        Returns the resolved absolute Path on success; raises PathViolation
-        otherwise. Evidence is never writable - not even by the server.
+        Relative paths are anchored at the run dir. Returns the resolved
+        absolute Path on success; raises PathViolation otherwise. Evidence
+        is never writable - not even by the server.
         """
-        resolved = _resolve(path)
+        resolved = _resolve(self._anchor(path, self.run_dir))
         if _is_within(resolved, self.run_dir):
             return resolved
         if _is_within(resolved, self.case_dir):
