@@ -82,6 +82,12 @@ host's logs is carried along.
 **Total size budget:** the whole of `cases/smoke/` stays well under 5 MB; the
 elevated script verifies the summed size before declaring success.
 
+**Regenerating Half B (only if missing):** the repo normally ships the four
+host-exported files already committed. If they are absent after a partial clone,
+run `scripts/make-smoke-case.ps1` **once, elevated**, on Windows 11, then commit
+or copy the outputs into `cases/smoke/`. See the script header for safety
+constraints (only `VerdictSmoke*` objects touched).
+
 ### Clean case (`cases/clean/`)
 
 A handful of obviously benign files — `readme.txt`, `app.log`, `config.ini` —
@@ -89,3 +95,122 @@ authored by item 5. `evidence_inventory` classifies them as `other`, and an
 honest investigation reports the folder clean with **zero invented findings**
 (the standing empty-case test, `prd.md > Failure & Empty-Case Behavior`). They
 contain no indicators: no `update.exe`, no service installs, no YARA marker.
+
+---
+
+## Primary dataset — The Case of the Stolen Szechuan Sauce
+
+DFIRmadness **Case 001** — the hackathon's accuracy benchmark and full
+autonomous-run target.
+
+### Provenance
+
+| Field | Value |
+|-------|-------|
+| **Case name** | The Case of the Stolen Szechuan Sauce |
+| **Publisher** | DFIRmadness / SANS community case series |
+| **Case page** | <https://dfirmadness.com/the-stolen-szechuan-sauce/> |
+| **Official answers** | <https://dfirmadness.com/answers-to-szechuan-case-001/> |
+| **Memory analysis tutorial** | <https://dfirmadness.com/case-001-memory-analysis/> |
+| **Scenario** | Active Directory domain **CITADEL** — internet-exposed RDP on **CITADEL-DC01** (`10.42.85.10`), lateral movement to **DESKTOP-SDN1RPT** (`10.42.85.115`); Meterpreter implant **`coreupdater.exe`**, C2, recipe exfiltration |
+| **Ground truth for scoring** | `docs/ground-truth.md` (24 scorable rows pinned from S1/S2/S2a) |
+| **Accuracy report** | `docs/accuracy-report.md` (checklist item 11 — scored after the full run) |
+
+Evidence is **not redistributed in this repository** (`.gitignore` excludes
+images, memory, pcap). Download on the SIFT VM with the script below.
+
+### What you get (11 archives)
+
+| Archive | Contents (approx.) |
+|---------|-------------------|
+| `DC01-E01.zip` | Domain controller disk image (E01) |
+| `DC01-memory.zip` | DC memory capture (`citadeldc01.mem`) |
+| `DC01-pagefile.zip` | DC pagefile |
+| `DC01-autorunsc.zip` | Autoruns export (DC) |
+| `DC01-ProtectedFiles.zip` | Protected files bundle (DC) |
+| `DESKTOP-E01.zip` | Workstation disk image (E01) |
+| `DESKTOP-SDN1RPT-memory.zip` | Desktop memory capture |
+| `Desktop-SDN1RPT-pagefile.zip` | Desktop pagefile |
+| `DESKTOP-SDN1RPT-autorunsc.zip` | Autoruns export (desktop) |
+| `DESKTOP-SDN1RPT-Protected Files.zip` | Protected files (desktop) |
+| `case001-pcap.zip` | Network capture (referenced; MVP does not deep-parse pcap) |
+
+**Download size:** ~13.5 GB zipped · **Extracted:** ~25–30 GB on disk.
+
+### Download and verify
+
+**On the SIFT Workstation VM** (recommended path):
+
+```bash
+git clone https://github.com/prabhakaran-jm/verdict.git
+cd verdict
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+pip install volatility3    # memory tools use the venv vol binary
+
+# Default target: /cases/szechuan/  (create with sudo if needed)
+sudo mkdir -p /cases/szechuan && sudo chown "$USER" /cases/szechuan
+./scripts/get-dataset.sh
+```
+
+`scripts/get-dataset.sh`:
+
+- Downloads from `https://dfirmadness.com/case001/` (URLs verified live 2026-06-11)
+- Verifies each archive against the **published MD5** from the case page
+- Is **idempotent and resume-safe** (`curl -C -` / `wget -c`; skips verified files)
+- Computes **SHA-256** of every archive into `SHA256SUMS.txt` under the target dir
+- Extracts each zip once (marker files prevent re-extraction)
+
+**Full Day-1 gate** (binaries + dataset + Vol3 pslist on both memory images):
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...   # not required for steps 1–3
+./scripts/day1-gate.sh /cases/szechuan
+```
+
+Gate artifacts land in `runs/day1-gate/` (binaries JSON, pslist smoke outputs).
+
+### Published MD5 checksums (verification record)
+
+These are the hashes `get-dataset.sh` enforces (from the case page, 2026-06-11):
+
+| File | MD5 |
+|------|-----|
+| `case001-pcap.zip` | `422046B753CF8A4DF49D2C4CE892DB16` |
+| `DC01-E01.zip` | `E57FC636E833C5F1AB58DFACE873BBDE` |
+| `DC01-memory.zip` | `64A4E2CB47138084A5C2878066B2D7B1` |
+| `DC01-pagefile.zip` | `964EEAF0009D08CC101DE4A83A4E5D23` |
+| `DC01-autorunsc.zip` | `964F2D710687D170C77C94947DA29E66` |
+| `DC01-ProtectedFiles.zip` | `AD29830A583EFE49C8C1C35FAFFD264F` |
+| `DESKTOP-E01.zip` | `71C5C3509331F472ABCDF81EB6EFFF07` |
+| `DESKTOP-SDN1RPT-memory.zip` | `CF31E2635C77811AAA1BB04A92A721E2` |
+| `Desktop-SDN1RPT-pagefile.zip` | `45C096F2688A0B5DE0346FB72391B245` |
+| `DESKTOP-SDN1RPT-autorunsc.zip` | `3627DCAFA54E1365489A4EC0CC3D6A1C` |
+| `DESKTOP-SDN1RPT-Protected Files.zip` | `3E1A358D50003A9351AC2160AE6F0495` |
+
+SHA-256 sums are computed at download time (not published by the case author) and
+written to `/cases/szechuan/SHA256SUMS.txt` for your local record.
+
+### Running an investigation
+
+```bash
+source .venv/bin/activate
+export ANTHROPIC_API_KEY=sk-ant-...
+verdict investigate /cases/szechuan/ --budget 5.00
+```
+
+Expect ~30–60 minutes wall-clock and ≤ $5 API spend (budget guard enforced).
+Outputs: `runs/<UTC-timestamp>/report.html`, `report.pdf`, `findings.json`,
+`ledger.jsonl`.
+
+### Known constraints (document honestly)
+
+- **Volatility 3 on Server 2012 R2 DC memory** can be slow or symbol-heavy; use
+  the venv `vol` binary, not a bare system install. Desktop memory is the primary
+  validation path in `day1-gate.sh`.
+- **Partition offsets** on E01 images vary; VERDICT auto-discovers partitions via
+  `mmls` when `partition_offset` is omitted (see `verdict_mcp/tools/_image_helpers.py`).
+- **Ground-truth C2 IP** in published answers is **`203.78.103.109`**; score against
+  `docs/ground-truth.md`, not against memory-only artifacts that may show session-specific
+  infrastructure.
