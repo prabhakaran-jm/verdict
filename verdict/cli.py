@@ -300,22 +300,41 @@ async def _run_investigation(
         finally:
             ui.update_status(cost_usd=budget_guard.total_cost)
 
-        # ---------------------------------------------------------------
-        # REPORT GENERATION GOES HERE (item 9)
-        #   One Sonnet call (REPORT_PROSE_SYSTEM) over the VERIFIED/UNCONFIRMED
-        #   findings -> report.html/pdf, reserving budget_guard.report_reserve().
-        #   budget_guard.notes carries any graceful-degradation lines for the
-        #   report. The ledger.jsonl + findings.json are already on disk.
-        # ---------------------------------------------------------------
+        # --- REPORT (item 9): render the self-contained report.html (one prose
+        #     Sonnet call over the VERIFIED/UNCONFIRMED findings via
+        #     REPORT_PROSE_SYSTEM), then attempt the PDF chain. The ledger.jsonl
+        #     + findings.json are already on disk; budget_guard.notes carries any
+        #     graceful-degradation lines to surface in the report. Report failure
+        #     must not sink an otherwise-complete run, so it degrades to a note.
+        report_path: str | None = None
+        pdf_path: str | None = None
+        try:
+            from verdict.report.generator import attempt_pdf, generate_report
+
+            report_path = generate_report(
+                str(run_dir), findings_store.findings,
+                str(run_dir / "ledger.jsonl"),
+                case_name=Path(case_dir).name, model=model,
+                total_cost=budget_guard.total_cost,
+                wall_time=ui.elapsed_str(),
+                anthropic_client=anthropic_client,
+                budget_notes=budget_guard.notes,
+            )
+            pdf_path = attempt_pdf(report_path)
+        except Exception as exc:  # noqa: BLE001 - report is the last artifact
+            ui.narration(f"report generation failed: {exc}")
+        ui.update_status(cost_usd=budget_guard.total_cost)
 
         # --- completion summary (severity-sorted findings + artifact paths).
-        ui.summary_table(
-            findings_store.findings,
-            artifacts={
-                "findings.json": str(findings_store.path),
-                "ledger.jsonl": str(run_dir / "ledger.jsonl"),
-            },
-        )
+        artifacts = {
+            "findings.json": str(findings_store.path),
+            "ledger.jsonl": str(run_dir / "ledger.jsonl"),
+        }
+        if report_path:
+            artifacts["report.html"] = report_path
+        if pdf_path:
+            artifacts["report.pdf"] = pdf_path
+        ui.summary_table(findings_store.findings, artifacts=artifacts)
         await _safe_log_event(client, "run_ended", {
             "findings": len(findings_store),
             "total_cost_usd": round(budget_guard.total_cost, 6),

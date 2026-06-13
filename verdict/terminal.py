@@ -216,6 +216,11 @@ class TerminalUI:
             self._live.stop()
             self._live = None
 
+    def elapsed_str(self) -> str:
+        """Human wall-clock elapsed since the status bar started (for the
+        report header). Falls back to construction time if never started."""
+        return _human_duration(time.monotonic() - self._start_monotonic)
+
     def _status_renderable(self) -> Text:
         elapsed = time.monotonic() - self._start_monotonic
         bar = Text()
