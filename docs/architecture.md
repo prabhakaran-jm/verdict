@@ -9,6 +9,55 @@ It shows what the agent **physically cannot do** — not what a prompt asks it t
 
 Implements `prd.md > Constrained Tooling` and `spec.md > Architecture Overview`.
 
+![VERDICT two-process architecture](architecture.png)
+
+*Source: [`architecture.mmd`](architecture.mmd) — regenerate with `npx @mermaid-js/mermaid-cli -i docs/architecture.mmd -o docs/architecture.png` or [Kroki](https://kroki.io/).*
+
+### Mermaid (renders on GitHub)
+
+```mermaid
+flowchart TB
+    subgraph ORCH["verdict orchestrator"]
+        direction TB
+        CLI["CLI"]
+        SURVEY["Survey"]
+        TRIAGE["TRIAGE LOOP<br/>Sonnet 4.6, cost ticker, budget guard<br/>rich terminal narration"]
+        VERIFIER["VERIFIER<br/>fresh context per finding<br/>restricted tool set"]
+        REPORT["Report generator<br/>Jinja2 to HTML and PDF"]
+        CLI --> SURVEY --> TRIAGE --> VERIFIER --> REPORT
+    end
+
+    MCP_CHANNEL{{"stdio MCP protocol<br/>ONLY channel"}}
+
+    subgraph MCP["verdict-mcp read-only server"]
+        direction TB
+        PYD["Pydantic validation"]
+        PG["Path guard<br/>case read-only, run write-only"]
+        RUN["Subprocess runner<br/>fixed binaries, shell=False, caps, SHA-256"]
+        LEDGER["ledger.jsonl<br/>single writer, append-only"]
+        PYD --> PG --> RUN --> LEDGER
+    end
+
+    subgraph STACK["Forensic stack"]
+        direction LR
+        TSK["Sleuth Kit"]
+        VOL["Volatility 3"]
+        YARA["YARA"]
+        EZ["EZ Tools and fallbacks"]
+    end
+
+    ORCH <-->|"typed tool calls"| MCP_CHANNEL
+    MCP_CHANNEL <--> MCP
+    MCP --> STACK
+
+    style ORCH fill:#e8f4fc,stroke:#005571,stroke-width:2px
+    style MCP fill:#fff4e6,stroke:#cc6600,stroke-width:2px
+    style STACK fill:#f0f0f0,stroke:#333,stroke-width:1px
+    style MCP_CHANNEL fill:#ffe6e6,stroke:#cc0000,stroke-width:2px
+```
+
+### ASCII (plain-text fallback)
+
 ```
 ┌────────────────────── verdict (orchestrator) ──────────────────────┐
 │  CLI ─→ survey ─→ TRIAGE LOOP ─→ VERIFIER ─→ report generator      │
@@ -70,6 +119,34 @@ server's rejection boundary catches anything that slips through.
 
 ## Data flow (one tool call)
 
+![Single tool call sequence](architecture-dataflow.png)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant M as Model (Claude)
+    participant O as Orchestrator
+    participant S as verdict-mcp server
+    participant B as Forensic binaries
+    participant L as ledger.jsonl
+
+    M->>O: tool_use block
+    O->>O: phase allowlist check
+    O->>S: MCP call_tool(name, input)
+    S->>S: Pydantic validation
+    S->>S: path guard (read / write)
+    S->>B: runner.run_tool(fixed path, argv)
+    B-->>S: stdout / stderr
+    S->>S: save full output + SHA-256
+    S->>L: append tool_called + tool_result
+    S-->>O: 8 KB excerpt
+    O-->>M: tool_result message
+```
+
+*Source: [`architecture-dataflow.mmd`](architecture-dataflow.mmd)*
+
+### ASCII (plain-text fallback)
+
 ```
 Model tool_use block
     → orchestrator phase check
@@ -126,3 +203,15 @@ verifier model choice (Sonnet 4.6), and smoke-case design.
 - Tool definitions and schemas: `spec.md > MCP Server > Tool definitions`
 - Binary matrix and Day-1 gate: `scripts/day1-gate.sh`, `verdict_mcp/binaries.py`
 - Dataset layout (not in git): `docs/dataset.md`
+
+## Regenerating diagram images
+
+```bash
+# Option A: Mermaid CLI (requires Node.js)
+npx @mermaid-js/mermaid-cli -i docs/architecture.mmd -o docs/architecture.png
+npx @mermaid-js/mermaid-cli -i docs/architecture-dataflow.mmd -o docs/architecture-dataflow.png
+
+# Option B: Kroki (no local install)
+curl -sS -X POST https://kroki.io/mermaid/png -H "Content-Type: text/plain" \
+  --data-binary @docs/architecture.mmd -o docs/architecture.png
+```

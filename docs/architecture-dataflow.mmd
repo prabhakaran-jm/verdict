@@ -1,0 +1,19 @@
+sequenceDiagram
+    autonumber
+    participant M as Model (Claude)
+    participant O as Orchestrator
+    participant S as verdict-mcp server
+    participant B as Forensic binaries
+    participant L as ledger.jsonl
+
+    M->>O: tool_use block
+    O->>O: phase allowlist check
+    O->>S: MCP call_tool(name, input)
+    S->>S: Pydantic validation
+    S->>S: path guard (read / write)
+    S->>B: runner.run_tool(fixed path, argv)
+    B-->>S: stdout / stderr
+    S->>S: save full output + SHA-256
+    S->>L: append tool_called + tool_result
+    S-->>O: 8 KB excerpt
+    O-->>M: tool_result message

@@ -1,0 +1,38 @@
+flowchart TB
+    subgraph ORCH["verdict orchestrator"]
+        direction TB
+        CLI["CLI"]
+        SURVEY["Survey"]
+        TRIAGE["TRIAGE LOOP<br/>Sonnet 4.6, cost ticker, budget guard<br/>rich terminal narration"]
+        VERIFIER["VERIFIER<br/>fresh context per finding<br/>restricted tool set"]
+        REPORT["Report generator<br/>Jinja2 to HTML and PDF"]
+        CLI --> SURVEY --> TRIAGE --> VERIFIER --> REPORT
+    end
+
+    MCP_CHANNEL{{"stdio MCP protocol<br/>ONLY channel"}}
+
+    subgraph MCP["verdict-mcp read-only server"]
+        direction TB
+        PYD["Pydantic validation"]
+        PG["Path guard<br/>case read-only, run write-only"]
+        RUN["Subprocess runner<br/>fixed binaries, shell=False, caps, SHA-256"]
+        LEDGER["ledger.jsonl<br/>single writer, append-only"]
+        PYD --> PG --> RUN --> LEDGER
+    end
+
+    subgraph STACK["Forensic stack"]
+        direction LR
+        TSK["Sleuth Kit"]
+        VOL["Volatility 3"]
+        YARA["YARA"]
+        EZ["EZ Tools and fallbacks"]
+    end
+
+    ORCH <-->|"typed tool calls"| MCP_CHANNEL
+    MCP_CHANNEL <--> MCP
+    MCP --> STACK
+
+    style ORCH fill:#e8f4fc,stroke:#005571,stroke-width:2px
+    style MCP fill:#fff4e6,stroke:#cc6600,stroke-width:2px
+    style STACK fill:#f0f0f0,stroke:#333,stroke-width:1px
+    style MCP_CHANNEL fill:#ffe6e6,stroke:#cc0000,stroke-width:2px
