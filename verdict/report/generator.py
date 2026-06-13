@@ -359,31 +359,28 @@ def _deterministic_summary(headline: list[dict[str, Any]],
         f"confidence, and the finding detail for the underlying evidence.")
 
 
-def _generate_prose(anthropic_client: Any, headline: list[dict[str, Any]],
-                    inventory: list[dict[str, Any]], model: str,
-                    ) -> tuple[str, list[dict[str, str]]]:
+async def _generate_prose(anthropic_client: Any, headline: list[dict[str, Any]],
+                          inventory: list[dict[str, Any]], model: str,
+                          ) -> tuple[str, list[dict[str, str]]]:
     """Produce (executive_summary, attack_narrative) via one prose call.
 
-    Best-effort: with no client, an empty headline, a call failure, or malformed
-    output, falls back to the deterministic honest summary with an empty
-    narrative. NEVER raises - the report must always render.
+    Async: awaited from the orchestrator's running event loop (cli) - an earlier
+    asyncio.run() here raised "cannot be called from a running loop", silently
+    fell back, and left the coroutine un-awaited. Best-effort otherwise: no
+    client, empty headline, call failure, or malformed output -> deterministic
+    honest summary + empty narrative. NEVER raises - the report must render.
     """
     fallback = (_deterministic_summary(headline, inventory), [])
     if anthropic_client is None or not headline:
         return fallback
     try:
-        import asyncio
-
-        async def _call() -> Any:
-            return await anthropic_client.messages.create(
-                model=model,
-                max_tokens=1500,
-                system=[{"type": "text", "text": REPORT_PROSE_SYSTEM}],
-                messages=[{"role": "user",
-                           "content": _findings_for_prose(headline)}],
-            )
-
-        response = asyncio.run(_call())
+        response = await anthropic_client.messages.create(
+            model=model,
+            max_tokens=1500,
+            system=[{"type": "text", "text": REPORT_PROSE_SYSTEM}],
+            messages=[{"role": "user",
+                       "content": _findings_for_prose(headline)}],
+        )
     except Exception:  # noqa: BLE001 - prose is best-effort; never fatal
         return fallback
 
@@ -401,11 +398,11 @@ def _generate_prose(anthropic_client: Any, headline: list[dict[str, Any]],
 # --------------------------------------------------------- public API
 
 
-def generate_report(run_dir: str, findings: list[dict], ledger_path: str,
-                    *, case_name: str, model: str, total_cost: float,
-                    wall_time: str = "", anthropic_client: Any = None,
-                    budget_notes: list[str] | None = None,
-                    interrupted: bool = False) -> str:
+async def generate_report(run_dir: str, findings: list[dict], ledger_path: str,
+                          *, case_name: str, model: str, total_cost: float,
+                          wall_time: str = "", anthropic_client: Any = None,
+                          budget_notes: list[str] | None = None,
+                          interrupted: bool = False) -> str:
     """Render template.html.j2 -> runs/<id>/report.html; returns the path.
 
     `findings` is the FindingsStore list (id/claim/severity/attack_id/cites/
@@ -438,8 +435,8 @@ def generate_report(run_dir: str, findings: list[dict], ledger_path: str,
         refuted_ctx.append(ctx)
 
     inventory = _inventory_from_ledger(records, run_path)
-    summary, narrative = _generate_prose(anthropic_client, headline_ctx,
-                                         inventory, model)
+    summary, narrative = await _generate_prose(anthropic_client, headline_ctx,
+                                               inventory, model)
 
     context = {
         "case_name": case_name,

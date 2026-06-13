@@ -311,7 +311,7 @@ async def _run_investigation(
         try:
             from verdict.report.generator import attempt_pdf, generate_report
 
-            report_path = generate_report(
+            report_path = await generate_report(
                 str(run_dir), findings_store.findings,
                 str(run_dir / "ledger.jsonl"),
                 case_name=Path(case_dir).name, model=model,
