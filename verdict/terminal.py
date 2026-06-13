@@ -262,16 +262,21 @@ class TerminalUI:
         table.add_column("ATT&CK", no_wrap=True, style="dim")
         table.add_column("Verdict", no_wrap=True)
         table.add_column("Claim", overflow="fold")
+        # The FindingsStore mirrors the server's finding_id into the canonical
+        # `id` field; raw server results use `finding_id`. Accept either.
+        def _fid(f: dict[str, Any]) -> str:
+            return str(f.get("id") or f.get("finding_id") or "?")
+
         ordered = sorted(
             findings,
             key=lambda f: (_SEVERITY_ORDER.get(str(f.get("severity")).lower(), 99),
-                           str(f.get("finding_id", ""))),
+                           _fid(f)),
         )
         for finding in ordered:
             severity = str(finding.get("severity", "?")).lower()
             verdict = str(finding.get("verdict") or "-")
             table.add_row(
-                str(finding.get("finding_id", "?")),
+                _fid(finding),
                 Text(severity, style=_SEVERITY_STYLE.get(severity, "white")),
                 str(finding.get("attack_id", "-")),
                 Text(verdict, style=_VERDICT_STYLE.get(verdict, "dim")),
