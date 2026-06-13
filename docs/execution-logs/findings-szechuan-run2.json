@@ -1,0 +1,79 @@
+[
+  {
+    "id": "F-001",
+    "claim": "A process named coreupdater.exe (PID 8324, PPID 4008) was running on DESKTOP-SDN1RPT and actively hidden from the Windows process list via DKOM (Direct Kernel Object Manipulation). It appeared in physical memory scan (psscan) but not in the standard process tree (pstree), ran from 2020-09-19 03:40:49 UTC to 03:43:10 UTC, and is not a legitimate Windows binary.",
+    "severity": "critical",
+    "attack_id": "T1055",
+    "cites": [
+      6,
+      87
+    ],
+    "verdict": "REFUTED",
+    "verdict_reason": "coreupdater.exe (PID 8324) appears in the pstree output as an orphaned top-level entry, directly contradicting the DKOM claim that it was hidden from pstree and visible only in psscan."
+  },
+  {
+    "id": "F-002",
+    "claim": "On DESKTOP-SDN1RPT, powershell.exe (PID 508, PPID 1380) spawned a second powershell.exe (PID 3316, PPID 508) at 2020-09-19 05:08:43 UTC. The parent PID 1380 is absent from both pstree and psscan — it has no visible ancestor, suggesting it was a completely hidden or already-terminated process used as the initial execution vector. The child powershell.exe (3316) spawned a conhost.exe (PID 728), indicating interactive command execution.",
+    "severity": "critical",
+    "attack_id": "T1059.001",
+    "cites": [
+      68,
+      101,
+      106,
+      111
+    ],
+    "verdict": "VERIFIED",
+    "verdict_reason": "psscan independently confirms PID 3316 (powershell.exe, PPID 508) created at 05:08:43 UTC, PID 508 (powershell.exe, PPID 1380) exited at 05:08:43 UTC, PID 728 (conhost.exe, PPID 3316) at same timestamp, and PID 1380 is absent from the entire psscan output — all matching the claim exactly.  [verifier note: REPLAY DRIFT on re-running `read_artifact`: fresh output SHA-256 4ae4a47fe380... does not match the cited SHA(s) 57f31cdc172a..., ff47a8dc774f... - the cited evidence is not reproducible (possible nondeterministic tool output); the citation could not be confirmed byte-for-byte.]"
+  },
+  {
+    "id": "F-003",
+    "claim": "DESKTOP-SDN1RPT had an ESTABLISHED TCP connection from 10.42.85.115:50957 to 10.42.85.10:445 (SMB) at time of memory capture. 10.42.85.10 is the DC (domain controller). This active SMB connection, combined with the DC01's FileShare directory (inode 86963, created 2020-09-19 03:34:18 UTC) which loops back to the entire drive root, is consistent with the attacker mapping the DC's C: drive as a network share for lateral movement and data access.",
+    "severity": "critical",
+    "attack_id": "T1021.002",
+    "cites": [
+      71,
+      10,
+      19
+    ],
+    "verdict": "VERIFIED",
+    "verdict_reason": "All three cited queries reproduced with matching SHA-256s: netscan confirms ESTABLISHED TCPv4 10.42.85.115:50957→10.42.85.10:445; fs_list confirms FileShare at inode 86963 created 2020-09-19 03:34:18 UTC; and fs_list /FileShare shows identical inodes to the drive root (junction looping to /), directly corroborating the DC C: drive share mapping claim."
+  },
+  {
+    "id": "F-004",
+    "claim": "DC01 (WIN-E0PO207ERMD.C137.local) shows C137\\\\Administrator logged in interactively (logon type 7) at 2020-09-18T03:41:57 UTC with full SeDebugPrivilege and backup/restore rights. This logon coincides precisely with coreupdater.exe running on the workstation (03:40:49–03:43:10 UTC) and the creation of the FileShare directory (03:34:18 UTC), suggesting the attacker had active control of the DC Administrator account at this time.",
+    "severity": "critical",
+    "attack_id": "T1078.002",
+    "cites": [
+      146,
+      10,
+      87
+    ],
+    "verdict": "REFUTED",
+    "verdict_reason": "The DC Administrator logon is 2020-09-18T03:41:57 UTC, but coreupdater.exe ran 2020-09-19T03:40:49–03:43:10 UTC and FileShare was created 2020-09-19T03:34:18 UTC — all three events are ~24 hours apart, directly contradicting the claim that they \"coincide precisely.\""
+  },
+  {
+    "id": "F-005",
+    "claim": "CITADEL-DC01 security log shows C137\\\\Administrator made multiple Kerberos Type 3 (network) logons from source IP 10.42.85.115 (DESKTOP-SDN1RPT workstation) at 2020-09-19T03:36:24 UTC. The attacker used domain Administrator credentials from the workstation to authenticate to the domain controller, arriving just 2 minutes after the FileShare was created on DC01 and 4 minutes before coreupdater.exe executed.",
+    "severity": "critical",
+    "attack_id": "T1550.003",
+    "cites": [
+      168,
+      10,
+      87
+    ],
+    "verdict": "VERIFIED",
+    "verdict_reason": "All three cited queries reproduced with exact SHA matches: Security log confirms multiple Kerberos LogonType=3 events for C137\\Administrator from 10.42.85.115 at 03:36:24 UTC; fs_list confirms FileShare created at 03:34:18 UTC (~2 min earlier); psscan confirms coreupdater.exe started at 03:40:49 UTC (~4 min later)."
+  },
+  {
+    "id": "F-006",
+    "claim": "CITADEL-DC01's spoolsv.exe crashed with exception code c0000005 (ACCESS_VIOLATION, fault module StackHash_1e37) at 2020-09-19 03:29:35 UTC — approximately 5 minutes before the FileShare directory was created. This timing suggests a potential print spooler exploitation attempt or printer bug abuse on the DC immediately preceding lateral movement.",
+    "severity": "high",
+    "attack_id": "T1210",
+    "cites": [
+      66,
+      184
+    ],
+    "verdict": "VERIFIED",
+    "verdict_reason": "WER report inode_87072 (SHA matched exactly) contains EventType=APPCRASH, NsAppName=spoolsv.exe, Fault Module=StackHash_1e37, ExceptionCode=c0000005, created at 2020-09-19 03:29:35 per MFT — all claim specifics confirmed in raw artifact content."
+  }
+]

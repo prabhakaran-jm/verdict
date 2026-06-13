@@ -1,0 +1,146 @@
+[
+  {
+    "id": "F-001",
+    "claim": "Two PowerShell processes (PID 508 and PID 3316) executed an identical Base64-encoded, GZip-compressed in-memory payload that uses Windows API reflection (GetProcAddress, GetModuleHandle, DefineDynamicAssembly) — the hallmark pattern of a Meterpreter or Cobalt Strike PowerShell stager. Script block logging captured the payload at 2020-09-19T05:08:42-44Z.",
+    "severity": "critical",
+    "attack_id": "T1059.001",
+    "cites": [
+      141,
+      20
+    ],
+    "verdict": "VERIFIED",
+    "verdict_reason": "Both cited SHA-256s reproduced exactly; event 4104 logs confirm Base64/GZip stager script blocks for PIDs 508 and 3316 at 05:08:42–44Z, and the decompressed payload explicitly contains GetProcAddress, GetModuleHandle, and DefineDynamicAssembly; both PIDs appear as powershell.exe in the memory cmdline output."
+  },
+  {
+    "id": "F-002",
+    "claim": "PowerShell PID 3316 contains multiple PAGE_EXECUTE_READWRITE memory regions including one with an MZ PE header — indicating reflective DLL injection / in-memory payload execution consistent with the stager captured in script block logging.",
+    "severity": "critical",
+    "attack_id": "T1055.001",
+    "cites": [
+      34,
+      141
+    ],
+    "verdict": "VERIFIED",
+    "verdict_reason": "Both cited outputs reproduced with matching SHA-256; malfind confirms 5 PAGE_EXECUTE_READWRITE regions in powershell.exe PID 3316 including one with a genuine MZ PE header at 0x10c6c070000, and script block log event 4104 for PID 3316 shows GetProcAddress/DefineDynamicAssembly/InMemoryModule calls consistent with reflective DLL injection."
+  },
+  {
+    "id": "F-003",
+    "claim": "spoolsv.exe (PID 2188) has an MZ PE header in a PAGE_EXECUTE_READWRITE VadS region, indicating code injected into the print spooler process — a technique used by post-exploitation frameworks to blend into trusted system processes.",
+    "severity": "high",
+    "attack_id": "T1055.001",
+    "cites": [
+      34
+    ],
+    "verdict": "VERIFIED",
+    "verdict_reason": "Malfind output reproduced with identical SHA-256 and directly shows spoolsv.exe PID 2188 with a VadS PAGE_EXECUTE_READWRITE region containing a valid MZ PE header (4d 5a 90 00), confirming code injection into the print spooler process."
+  },
+  {
+    "id": "F-004",
+    "claim": "A binary named coreupdater.exe (96 bytes in $FILE_NAME, inode 26213) was written to C:\\Windows\\System32\\ at 2020-09-19T03:40:00Z and executed immediately (prefetch created at 03:40:59Z; memory shows PID 8324 running from 03:40:49 to 03:43:10Z). The name masquerades as a system updater placed in the trusted System32 directory. The binary is a PE64 executable (7168 bytes, SHA-256 10f3b92...).",
+    "severity": "critical",
+    "attack_id": "T1036.005",
+    "cites": [
+      69,
+      45,
+      74
+    ],
+    "verdict": "VERIFIED",
+    "verdict_reason": "All three cited queries reproduced with matching SHA-256s: timeline confirms coreupdater.exe written to System32 at 03:40:00Z (inode 26213, 96 bytes in $FILE_NAME) with prefetch at 03:40:59Z; pslist confirms PID 8324 ran from 03:40:49 to 03:43:10Z; extracted binary (7168 bytes, SHA-256 10f3b92...) has valid MZ/PE header with machine type 0x8664 (PE64/AMD64), confirming the masquerading executable identity."
+  },
+  {
+    "id": "F-005",
+    "claim": "At 2020-09-19T03:36:22Z, the domain Administrator account (S-1-5-21-2232410529-1445159330-2725690660-500) from IP 10.42.85.10 (DC01) performed a successful Type 3 (Network/Kerberos) logon to DESKTOP-SDN1RPT. Four minutes later, coreupdater.exe was written to C:\\Windows\\System32\\. This is lateral movement from the already-compromised DC to the workstation via the domain Administrator credential.",
+    "severity": "critical",
+    "attack_id": "T1021.002",
+    "cites": [
+      183,
+      69
+    ],
+    "verdict": "VERIFIED",
+    "verdict_reason": "Both cited outputs reproduced with matching SHA-256s: Event 4624 at 03:36:22Z confirms Type-3/Kerberos logon by Administrator (S-1-5-21-2232410529-1445159330-2725690660-500) from 10.42.85.10 to DESKTOP-SDN1RPT; timeline confirms coreupdater.exe written to C:\\Windows\\System32\\ at 03:40:00Z (~3m38s later) with a prefetch file at 03:40:59Z confirming execution."
+  },
+  {
+    "id": "F-006",
+    "claim": "Domain users C137\\ricksanchez and C137\\mortysmith had multiple local sessions on DESKTOP-SDN1RPT between 2020-09-18T22:44Z and 2020-09-18T23:10Z — their accounts may represent initial access or attacker-controlled credentials used in the domain before lateral movement to the DC occurred.",
+    "severity": "high",
+    "attack_id": "T1078.002",
+    "cites": [
+      125,
+      128
+    ],
+    "verdict": "VERIFIED",
+    "verdict_reason": "Raw TerminalServices-LocalSessionManager events (IDs 21/22/23/24) independently reproduced with matching SHA-256 show C137\\ricksanchez with two LOCAL sessions (22:44–22:45 and 22:52–22:56) and C137\\mortysmith with two LOCAL sessions (22:46–22:52 and 22:59–23:10) on DESKTOP-SDN1RPT.C137.local, exactly matching the claimed time window and session multiplicity."
+  },
+  {
+    "id": "F-007",
+    "claim": "At memory capture time, DESKTOP-SDN1RPT had an ESTABLISHED TCP connection to 52.242.211.89:443 (source port 50645). This external IP is not associated with common Microsoft services and co-occurs with two PowerShell processes executing a Meterpreter-style stager — consistent with an active C2 beacon over HTTPS.",
+    "severity": "critical",
+    "attack_id": "T1071.001",
+    "cites": [
+      17,
+      141
+    ],
+    "verdict": "VERIFIED",
+    "verdict_reason": "Netscan independently confirms TCPv4 ESTABLISHED 10.42.85.115:50645→52.242.211.89:443; PowerShell Operational log (event 4104) shows two PS processes (PIDs 508, 3316) executing a gzipped/base64 stager with GetProcAddress/UnsafeNativeMethods shellcode injection — textbook Meterpreter stager; both SHA-256s matched exactly."
+  },
+  {
+    "id": "F-008",
+    "claim": "DC01 (10.42.85.10) was compromised before 2020-09-19T03:36Z — the domain Administrator account was used FROM the DC to authenticate to the workstation. The protected forensic artifact set includes DC01's ntds.dit (the Active Directory database containing all domain password hashes), indicating the attacker had administrative access to the DC and the capability to extract all domain credentials.",
+    "severity": "critical",
+    "attack_id": "T1003.003",
+    "cites": [
+      183,
+      3
+    ],
+    "verdict": "VERIFIED",
+    "verdict_reason": "evtx_query SHA matched exactly; event 4624 at 03:36:22 on DESKTOP-SDN1RPT confirms Administrator Kerberos network logon (LogonType 3) sourced from 10.42.85.10 (DC01); evidence inventory confirms Protected/ntds.dit exists at ~20MB, consistent with a real AD database."
+  },
+  {
+    "id": "F-009",
+    "claim": "At memory capture time, an ESTABLISHED SMB connection exists from DESKTOP-SDN1RPT (10.42.85.115:50957) to DC01 (10.42.85.10:445). The process owner column shows '-' (no owning process = the owning process already exited), consistent with coreupdater.exe or a Meterpreter payload having accessed the DC via SMB before memory capture.",
+    "severity": "high",
+    "attack_id": "T1021.002",
+    "cites": [
+      17
+    ],
+    "verdict": "VERIFIED",
+    "verdict_reason": "Netscan output (SHA matched) shows exactly one ESTABLISHED TCPv4 entry from 10.42.85.115:50957 to 10.42.85.10:445 with PID/Owner both '-' and Created N/A, confirming the ownerless SMB connection to DC01 as claimed."
+  },
+  {
+    "id": "F-010",
+    "claim": "coreupdater.exe (inode 26213) has a PE compilation timestamp of 0x4BC63C7D (~April 15, 2010) yet the file first appeared on disk at 2020-09-19T03:40:00Z — a discrepancy of ~10 years. This forged PE timestamp is a classic technique to make a newly dropped binary appear to be a long-standing legacy system file.",
+    "severity": "medium",
+    "attack_id": "T1070.006",
+    "cites": [
+      85,
+      69
+    ],
+    "verdict": "VERIFIED",
+    "verdict_reason": "Hex dump at offset 0xD0 confirms PE TimeDateStamp bytes 7d 3c c6 4b = 0x4BC63C7D (~April 15, 2010), while timeline independently shows inode 26213 born on 2020-09-19T03:40:00Z — a ~10-year discrepancy consistent with a forged compilation timestamp; both cited SHA-256 hashes reproduced exactly."
+  },
+  {
+    "id": "F-011",
+    "claim": "At 2020-09-19T03:36:42Z, the Recycle Bin directory for the domain Administrator SID (S-1-5-21-2232410529-1445159330-2725690660-500) was created on DESKTOP-SDN1RPT — confirming the attacker's first-ever filesystem access via the ADMIN$ SMB share. At 2020-09-19T03:40:00Z coreupdater.exe was written to C:\\Windows\\System32\\. The 3.5-minute window between first SMB access and file creation is the attacker's file staging activity.",
+    "severity": "critical",
+    "attack_id": "T1570",
+    "cites": [
+      230,
+      183,
+      69
+    ],
+    "verdict": "VERIFIED",
+    "verdict_reason": "All three cited queries reproduced with matching SHAs: Recycle Bin for SID-500 (domain Administrator) created at 03:36:42, a Kerberos network logon (LogonType 3) from 10.42.85.10 at 03:36:22 confirming remote SMB-style access, and coreupdater.exe written to C:\\Windows\\System32 at 03:40:00 with a prefetch file confirming execution — all within the claimed ~3.5-minute window."
+  },
+  {
+    "id": "F-012",
+    "claim": "At 2020-09-19T03:43:10Z — the exact second coreupdater.exe exited (per memory psscan) — a new RSA key file was created for the SYSTEM account (ProgramData/Microsoft/Crypto/RSA/S-1-5-18/68750476488cb25b21fd0b73cf723a47_511cefa6-2706-41b2-b1d8-b70acd58c1f3). This timing suggests coreupdater.exe provisioned a cryptographic identity before exiting, possibly for an encrypted C2 channel or scheduled persistence mechanism.",
+    "severity": "high",
+    "attack_id": "T1553.004",
+    "cites": [
+      228,
+      45
+    ],
+    "verdict": "VERIFIED",
+    "verdict_reason": "Both cited queries reproduced with matching SHA-256s: pslist confirms coreupdater.exe exited at 2020-09-19 03:43:10 UTC, and fs_list confirms RSA/S-1-5-18/68750476... was created with all MACB timestamps at that exact same second — the claimed timing coincidence is genuine (minor error: claim says psscan but evidence is from pslist)."
+  }
+]

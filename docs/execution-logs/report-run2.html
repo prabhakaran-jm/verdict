@@ -1,0 +1,2446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VERDICT report - szechuan</title>
+  <style>
+    :root {
+      --critical: #b91c1c; --high: #c2410c; --medium: #b45309; --low: #0e7490;
+      --verified: #15803d; --unconfirmed: #b45309; --refuted: #b91c1c;
+      --ink: #1f2933; --muted: #5b6573; --line: #d6dbe1; --bg-soft: #f6f8fa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        Helvetica, Arial, sans-serif;
+      color: var(--ink); line-height: 1.5; margin: 0;
+      padding: 2rem 1.5rem 4rem; max-width: 60rem; margin: 0 auto;
+    }
+    h1 { font-size: 1.7rem; margin: 0 0 .25rem; }
+    h2 {
+      font-size: 1.25rem; margin: 2.25rem 0 .75rem;
+      border-bottom: 2px solid var(--line); padding-bottom: .25rem;
+    }
+    h3 { font-size: 1.05rem; margin: 1.5rem 0 .4rem; }
+    a { color: #1d4ed8; }
+    p { margin: .5rem 0; }
+    code, pre, .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .82rem;
+    }
+    pre {
+      background: var(--bg-soft); border: 1px solid var(--line);
+      border-radius: 4px; padding: .6rem .75rem; overflow-x: auto;
+      white-space: pre-wrap; word-break: break-word; margin: .4rem 0;
+    }
+    .muted { color: var(--muted); }
+    .meta-grid {
+      display: grid; grid-template-columns: max-content 1fr; gap: .25rem 1.25rem;
+      margin: .75rem 0 0; font-size: .95rem;
+    }
+    .meta-grid dt { color: var(--muted); }
+    .meta-grid dd { margin: 0; font-weight: 600; }
+    table { border-collapse: collapse; width: 100%; margin: .75rem 0; font-size: .92rem; }
+    th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { background: var(--bg-soft); font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
+    .sev { font-weight: 700; text-transform: uppercase; font-size: .78rem; letter-spacing: .03em; }
+    .sev-critical { color: var(--critical); }
+    .sev-high { color: var(--high); }
+    .sev-medium { color: var(--medium); }
+    .sev-low { color: var(--low); }
+    .verdict { font-weight: 700; font-size: .8rem; }
+    .verdict-VERIFIED { color: var(--verified); }
+    .verdict-UNCONFIRMED { color: var(--unconfirmed); }
+    .verdict-REFUTED { color: var(--refuted); }
+    .finding { border: 1px solid var(--line); border-radius: 6px; padding: .25rem 1rem 1rem; margin: 1rem 0; }
+    .finding-head { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: baseline; }
+    .excerpt-path { font-size: .8rem; color: var(--muted); margin: .6rem 0 .15rem; }
+    .note { background: #fef9c3; border: 1px solid #fde047; border-radius: 4px; padding: .5rem .75rem; margin: .6rem 0; font-size: .9rem; }
+    .empty { color: var(--muted); font-style: italic; padding: .5rem 0; }
+    .ledger-entry { border-bottom: 1px solid var(--line); padding: .35rem 0; }
+    .ledger-entry:target { background: #fff7d6; outline: 2px solid #fde047; }
+    .ledger-seq { font-weight: 700; color: var(--muted); }
+    sup a { text-decoration: none; }
+    footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .82rem; }
+    @media print {
+      body { padding: 0; max-width: none; }
+      h2 { page-break-after: avoid; }
+      .finding, .ledger-entry { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>VERDICT &mdash; Investigation Report</h1>
+  <p class="muted">Autonomous, self-verified DFIR triage with a server-written audit ledger.</p>
+  <dl class="meta-grid">
+    <dt>Case</dt><dd>szechuan</dd>
+    <dt>Run ID</dt><dd class="mono">20260613T165313Z</dd>
+    <dt>Wall time</dt><dd>49m 52s</dd>
+    <dt>Total API cost</dt><dd>$3.7337</dd>
+    <dt>Model</dt><dd class="mono">claude-sonnet-4-6</dd>
+    <dt>Findings</dt><dd>4 reported &middot; 2 refuted</dd>
+  </dl>
+  <div class="note"><strong>Budget guard:</strong> Triage reached its soft budget cap ($3.00 of $5.00 total; spent $3.05); stopped opening new hypotheses and transitioned to verification.</div>
+</header>
+
+<section>
+  <h2>1. Executive summary</h2>
+  <p>On September 19, 2020, an attacker compromised a Windows workstation (DESKTOP-SDN1RPT) and used it as a launchpad to break into the organization&#39;s domain controller (CITADEL-DC01), gaining the highest level of administrative access across the entire network. The attack began in the early hours of the morning when a hidden or already-vanished process silently launched PowerShell on the workstation, giving the attacker an interactive foothold. Shortly after, the domain controller&#39;s print service crashed under suspicious circumstances, consistent with an exploitation attempt used to help gain entry to that server. Within minutes, the attacker had connected to the domain controller over the network and created a shared folder that exposed the entire contents of the server&#39;s hard drive. The attacker then logged into the domain controller using stolen domain Administrator credentials, arriving just two minutes after that share was created. At the time the workstation&#39;s memory was captured, an active network connection to the domain controller was still open, confirming the intrusion was ongoing. The full scope of data accessed or stolen from the domain controller&#39;s exposed drive cannot be ruled out and must be assumed significant given the Administrator-level access obtained.</p>
+</section>
+
+<section>
+  <h2>2. Attack narrative</h2>
+  <p>
+At approximately 03:29 UTC on September 19, 2020, the print spooler service on the domain controller crashed with an access violation error, suggesting the attacker exploited or probed this service as a means to gain an initial foothold on the server.<sup><a href="#F-006">[F-006]</a></sup> At 03:34 UTC, a directory on the domain controller was configured as a network share pointing back to the entire root of the server&#39;s drive, giving anyone with access to the share unrestricted visibility into all files on the domain controller.<sup><a href="#F-003">[F-003]</a></sup> Just two minutes later, at 03:36 UTC, the attacker used stolen domain Administrator credentials to authenticate from the workstation (10.42.85.115) to the domain controller over the network, confirming they had already acquired the organization&#39;s most privileged account.<sup><a href="#F-005">[F-005]</a></sup> At 05:08 UTC, a PowerShell process with no traceable parent — indicating a hidden or already-terminated initial execution vector — spawned an interactive PowerShell session on the workstation, demonstrating the attacker maintained ongoing command execution capability well after the domain controller had been compromised.<sup><a href="#F-002">[F-002]</a></sup> At the time the workstation&#39;s memory was captured, an active network connection over SMB remained open between the workstation and the domain controller, consistent with the attacker continuing to browse or stage data from the fully exposed server drive.<sup><a href="#F-003">[F-003]</a></sup>   </p>
+</section>
+
+<section>
+  <h2>3. Findings</h2>
+  <p class="muted">Verified and unconfirmed findings only. Refuted claims are in Appendix A.</p>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Claim</th><th>Severity</th><th>Confidence</th><th>ATT&amp;CK</th><th>Evidence</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="mono"><a href="#F-002">F-002</a></td>
+        <td>On DESKTOP-SDN1RPT, powershell.exe (PID 508, PPID 1380) spawned a second powershell.exe (PID 3316, PPID 508) at 2020-09-19 05:08:43 UTC. The parent PID 1380 is absent from both pstree and psscan — it has no visible ancestor, suggesting it was a completely hidden or already-terminated process used as the initial execution vector. The child powershell.exe (3316) spawned a conhost.exe (PID 728), indicating interactive command execution.</td>
+        <td class="sev sev-critical">critical</td>
+        <td class="verdict verdict-VERIFIED">VERIFIED</td>
+        <td class="mono">T1059.001</td>
+        <td>4</td>
+      </tr>
+      <tr>
+        <td class="mono"><a href="#F-003">F-003</a></td>
+        <td>DESKTOP-SDN1RPT had an ESTABLISHED TCP connection from 10.42.85.115:50957 to 10.42.85.10:445 (SMB) at time of memory capture. 10.42.85.10 is the DC (domain controller). This active SMB connection, combined with the DC01&#39;s FileShare directory (inode 86963, created 2020-09-19 03:34:18 UTC) which loops back to the entire drive root, is consistent with the attacker mapping the DC&#39;s C: drive as a network share for lateral movement and data access.</td>
+        <td class="sev sev-critical">critical</td>
+        <td class="verdict verdict-VERIFIED">VERIFIED</td>
+        <td class="mono">T1021.002</td>
+        <td>3</td>
+      </tr>
+      <tr>
+        <td class="mono"><a href="#F-005">F-005</a></td>
+        <td>CITADEL-DC01 security log shows C137\\Administrator made multiple Kerberos Type 3 (network) logons from source IP 10.42.85.115 (DESKTOP-SDN1RPT workstation) at 2020-09-19T03:36:24 UTC. The attacker used domain Administrator credentials from the workstation to authenticate to the domain controller, arriving just 2 minutes after the FileShare was created on DC01 and 4 minutes before coreupdater.exe executed.</td>
+        <td class="sev sev-critical">critical</td>
+        <td class="verdict verdict-VERIFIED">VERIFIED</td>
+        <td class="mono">T1550.003</td>
+        <td>3</td>
+      </tr>
+      <tr>
+        <td class="mono"><a href="#F-006">F-006</a></td>
+        <td>CITADEL-DC01&#39;s spoolsv.exe crashed with exception code c0000005 (ACCESS_VIOLATION, fault module StackHash_1e37) at 2020-09-19 03:29:35 UTC — approximately 5 minutes before the FileShare directory was created. This timing suggests a potential print spooler exploitation attempt or printer bug abuse on the DC immediately preceding lateral movement.</td>
+        <td class="sev sev-high">high</td>
+        <td class="verdict verdict-VERIFIED">VERIFIED</td>
+        <td class="mono">T1210</td>
+        <td>2</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>4. Finding detail</h2>
+  <div class="finding" id="F-002">
+    <div class="finding-head">
+      <h3 style="margin:.6rem 0 0">F-002</h3>
+      <span class="sev sev-critical">critical</span>
+      <span class="verdict verdict-VERIFIED">VERIFIED</span>
+      <span class="mono muted">T1059.001</span>
+    </div>
+    <p>On DESKTOP-SDN1RPT, powershell.exe (PID 508, PPID 1380) spawned a second powershell.exe (PID 3316, PPID 508) at 2020-09-19 05:08:43 UTC. The parent PID 1380 is absent from both pstree and psscan — it has no visible ancestor, suggesting it was a completely hidden or already-terminated process used as the initial execution vector. The child powershell.exe (3316) spawned a conhost.exe (PID 728), indicating interactive command execution.</p>
+    <h4 style="margin:.6rem 0 .2rem; font-size:.92rem;">Evidence</h4>
+      <div>
+        <div class="excerpt-path">
+          cite <a href="#ledger-68">seq 68</a>
+          &middot; <span class="mono">mem_analyze</span>
+&middot; <span class="mono">outputs/0067_mem_analyze.txt</span>        </div>
+<pre>Volatility 3 Framework 2.28.0
+
+PID	Process	Args
+
+4	System	-
+92	Registry	-
+312	smss.exe	-
+424	csrss.exe	�삅蠏譈偿郫證䣖䶍ꑼ￿㍅䧤횋譈茈ࡹ䠁䶍䆰霏䓄斉ꑞ￿譈䰈⦋蕍࿭骄
+500	wininit.exe	-
+616	services.exe	C:\Windows\system32\services.exe
+656	lsass.exe	C:\Windows\system32\lsass.exe
+764	svchost.exe	C:\Windows\system32\svchost.exe -k DcomLaunch -p
+784	fontdrvhost.ex	-
+884	svchost.exe	C:\Windows\system32\svchost.exe -k RPCSS -p
+448	svchost.exe	C:\Windows\system32\svchost.exe -k netsvcs -p
+520	svchost.exe	C:\Windows\System32\svchost.exe -k NetworkService
+904	svchost.exe	C:\Windows\system32\svchost.exe -k LocalServiceNoNetwork -p
+968	svchost.exe	C:\Windows\system32\svchost.exe -k LocalService -p
+988	svchost.exe	C:\Windows\System32\svchost.exe -k LocalServiceNetworkRestricted -p
+1096	svchost.exe	C:\Windows\system32\svchost.exe -k NetworkService -p
+1136	svchost.exe	-
+1148	svchost.exe	-
+1408	svchost.exe	-
+1576	svchost.exe	-
+1816	MemCompression	-
+1896	svchost.exe	C:\Windows\System32\svchost.exe -k LocalServiceNetworkRestricted -p
+2040	svchost.exe	C:\Windows\System32\svchost.exe -k LocalServiceNetworkRestricted -p
+1032	svchost.exe	C:\Windows\system32\svchost.exe -k appmodel -p
+1192	svchost.exe	-
+2060	svchost.exe	-
+2188	spo
+... (truncated; full output in the run folder)</pre>      </div>
+      <div>
+        <div class="excerpt-path">
+          cite <a href="#ledger-101">seq 101</a>
+          &middot; <span class="mono">mem_analyze</span>
+&middot; <span class="mono">outputs/0100_mem_analyze.txt</span>        </div>
+<pre>Volatility 3 Framework 2.28.0
+
+PID	PPID	ImageFileName	Offset(V)	Threads	Handles	SessionId	Wow64	CreateTime	ExitTime	File output
+
+3388	616	svchost.exe	0x7f8318124080	6	-	2	False	2020-09-19 05:08:19.000000 UTC	N/A	Disabled
+3388	616	svchost.exe	0x7f9518124080	6	-	2	False	2020-09-19 05:08:19.000000 UTC	N/A	Disabled
+3388	616	svchost.exe	0x7fb800128080	6	-	2	False	2020-09-19 05:08:19.000000 UTC	N/A	Disabled
+5896	5204	explorer.exe	0x7fb801ad1080	75	-	2	False	2020-09-19 05:08:16.000000 UTC	N/A	Disabled
+2208	616	svchost.exe	0x7fb801b49240	1	-	0	False	2020-09-19 01:26:11.000000 UTC	N/A	Disabled
+8416	764	WmiPrvSE.exe	0x7fb804ec12c0	7	-	0	False	2020-09-19 05:09:13.000000 UTC	N/A	Disabled
+7852	764	RuntimeBroker.	0x7fb80cd60080	7	-	2	False	2020-09-19 05:08:59.000000 UTC	N/A	Disabled
+312	4	smss.exe	0x7fb80f898040	2	-	N/A	False	2020-09-19 01:24:07.000000 UTC	N/A	Disabled
+3232	448	sihost.exe	0x7fb819451080	20	-	2	False	2020-09-19 05:08:15.000000 UTC	N/A	Disabled
+3232	448	sihost.exe	0x7fb81ce29080	20	-	2	False	2020-09-19 05:08:15.000000 UTC	N/A	Disabled
+8984	3708	SearchFilterHo	0x7fb829528080	1	-	0	False	2020-09-19 05:08:18.000000 UTC	N/A	Disabled
+8416	764	WmiPrvSE.exe	0x7fb82a0102c0	7	-	0	False	202
+... (truncated; full output in the run folder)</pre>      </div>
+      <div>
+        <div class="excerpt-path">
+          cite <a href="#ledger-106">seq 106</a>
+          &middot; <span class="mono">read_artifact</span>
+&middot; <span class="mono">outputs/0105_read_artifact.json</span>        </div>
+<pre>{
+  &#34;path&#34;: &#34;outputs/0100_mem_analyze.txt&#34;,
+  &#34;file_size&#34;: 16117,
+  &#34;offset&#34;: 6000,
+  &#34;returned_bytes&#34;: 8192,
+  &#34;eof&#34;: false,
+  &#34;mode&#34;: &#34;text&#34;,
+  &#34;content&#34;: &#34;sabled\n3232\t448\tsihost.exe\t0x7ffa1ce29080\t20\t-\t2\tFalse\t2020-09-19 05:08:15.000000 UTC\tN/A\tDisabled\n8984\t3708\tSearchFilterHo\t0x7ffa29528080\t1\t-\t0\tFalse\t2020-09-19 05:08:18.000000 UTC\tN/A\tDisabled\n8416\t764\tWmiPrvSE.exe\t0x7ffa2a0102c0\t7\t-\t0\tFalse\t2020-09-19 05:09:13.000000 UTC\tN/A\tDisabled\n3316\t508\tpowershell.exe\t0x7ffa2d799200\t11\t-\t2\tFalse\t2020-09-19 05:08:43.000000 UTC\tN/A\tDisabled\n4868\t764\tbackgroundTask\t0x7ffa304f9080\t12\t-\t2\tFalse\t2020-09-19 05:10:08.000000 UTC\tN/A\tDisabled\n3316\t508\tpowershell.exe\t0x7ffa31de0200\t11\t-\t2\tFalse\t2020-09-19 05:08:43.000000 UTC\tN/A\tDisabled\n3388\t616\tsvchost.exe\t0x7ffa339d1080\t6\t-\t2\tFalse\t2020-09-19 05:08:19.000000 UTC\tN/A\tDisabled\n4868\t764\tbackgroundTask\t0x7ffa34bc9080\t12\t-\t2\tFalse\t2020-09-19 05:10:08.000000 UTC\tN/A\tDisabled\n4592\t764\tMicrosoftEdge.\t0x7ffa36611080\t0\t-\t1\tFalse\t2020-09-19 03:16:05.000000 UTC\t2020-09-19 03:17:00.000000 UTC\tDisabled\n5256\t764\tsmartscreen.ex\t0x7ffa3f129080\t8\t-\t2\tFals
+... (truncated; full output in the run folder)</pre>      </div>
+      <div>
+        <div class="excerpt-path">
+          cite <a href="#ledger-111">seq 111</a>
+          &middot; <span class="mono">read_artifact</span>
+&middot; <span class="mono">outputs/0110_read_artifact.json</span>        </div>
+<pre>{
+  &#34;path&#34;: &#34;outputs/0100_mem_analyze.txt&#34;,
+  &#34;file_size&#34;: 16117,
+  &#34;offset&#34;: 14000,
+  &#34;returned_bytes&#34;: 2117,
+  &#34;eof&#34;: true,
+  &#34;mode&#34;: &#34;text&#34;,
+  &#34;content&#34;: &#34;000 UTC\tN/A\tDisabled\n8732\t764\tbackgroundTask\t0xbe8e78a21080\t0\t-\t2\tFalse\t2020-09-19 05:09:20.000000 UTC\t2020-09-19 05:10:21.000000 UTC\tDisabled\n4272\t7508\tMicrosoftEdgeS\t0xbe8e78a7d080\t9\t-\t2\tFalse\t2020-09-19 05:08:22.000000 UTC\tN/A\tDisabled\n4868\t764\tbackgroundTask\t0xbe8e78b27080\t12\t-\t2\tFalse\t2020-09-19 05:10:08.000000 UTC\tN/A\tDisabled\n1768\t6456\tdwm.exe\t0xbe8e78cab080\t15\t-\t2\tFalse\t2020-09-19 03:17:01.000000 UTC\tN/A\tDisabled\n7328\t5896\tmsinfo32.exe\t0xbe8e78caf080\t5\t-\t2\tFalse\t2020-09-19 05:09:13.000000 UTC\tN/A\tDisabled\n2084\t764\tStartMenuExper\t0xbe8e78cbd080\t8\t-\t2\tFalse\t2020-09-19 05:08:20.000000 UTC\tN/A\tDisabled\n3316\t508\tpowershell.exe\t0xbe8e78dd1200\t11\t-\t2\tFalse\t2020-09-19 05:08:43.000000 UTC\tN/A\tDisabled\n8152\t764\tRuntimeBroker.\t0xbe8e78e962c0\t4\t-\t2\tFalse\t2020-09-19 05:08:25.000000 UTC\tN/A\tDisabled\n7252\t5896\tvmtoolsd.exe\t0xbe8e78f94080\t6\t-\t2\tFalse\t2020-09-19 05:08:34.000000 UTC\tN/A\tDisabled\n5664\t616\tSecurityHealth\t0xbe8e79004280
+... (truncated; full output in the run folder)</pre>      </div>
+    <h4 style="margin:.8rem 0 .2rem; font-size:.92rem;">Verifier's reproduction note</h4>
+    <p>psscan independently confirms PID 3316 (powershell.exe, PPID 508) created at 05:08:43 UTC, PID 508 (powershell.exe, PPID 1380) exited at 05:08:43 UTC, PID 728 (conhost.exe, PPID 3316) at same timestamp, and PID 1380 is absent from the entire psscan output — all matching the claim exactly.  [verifier note: REPLAY DRIFT on re-running `read_artifact`: fresh output SHA-256 4ae4a47fe380... does not match the cited SHA(s) 57f31cdc172a..., ff47a8dc774f... - the cited evidence is not reproducible (possible nondeterministic tool output); the citation could not be confirmed byte-for-byte.]</p>
+  </div>
+  <div class="finding" id="F-003">
+    <div class="finding-head">
+      <h3 style="margin:.6rem 0 0">F-003</h3>
+      <span class="sev sev-critical">critical</span>
+      <span class="verdict verdict-VERIFIED">VERIFIED</span>
+      <span class="mono muted">T1021.002</span>
+    </div>
+    <p>DESKTOP-SDN1RPT had an ESTABLISHED TCP connection from 10.42.85.115:50957 to 10.42.85.10:445 (SMB) at time of memory capture. 10.42.85.10 is the DC (domain controller). This active SMB connection, combined with the DC01&#39;s FileShare directory (inode 86963, created 2020-09-19 03:34:18 UTC) which loops back to the entire drive root, is consistent with the attacker mapping the DC&#39;s C: drive as a network share for lateral movement and data access.</p>
+    <h4 style="margin:.6rem 0 .2rem; font-size:.92rem;">Evidence</h4>
+      <div>
+        <div class="excerpt-path">
+          cite <a href="#ledger-71">seq 71</a>
+          &middot; <span class="mono">mem_analyze</span>
+&middot; <span class="mono">outputs/0070_mem_analyze.txt</span>        </div>
+<pre>Volatility 3 Framework 2.28.0
+
+Offset	Proto	LocalAddr	LocalPort	ForeignAddr	ForeignPort	State	PID	Owner	Created
+
+0x7fb81f1d85e0	UDPv4	0.0.0.0	16512	*	0		2684	svchost.exe	2020-09-19 03:13:22.000000 UTC
+0x7fb8216a9760	TCPv4	10.42.85.115	51003	72.21.91.29	80	CLOSED	-	-	N/A
+0x7fb826581e40	UDPv4	0.0.0.0	0	*	0		1096	svchost.exe	2020-09-19 05:09:15.000000 UTC
+0x7fb826581e40	UDPv6	::	0	*	0		1096	svchost.exe	2020-09-19 05:09:15.000000 UTC
+0x7fb82fcf0be0	TCPv4	0.0.0.0	3389	0.0.0.0	0	LISTENING	520	svchost.exe	2020-09-19 01:24:09.000000 UTC
+0x7fc41f1d85e0	UDPv4	0.0.0.0	16512	*	0		2684	svchost.exe	2020-09-19 03:13:22.000000 UTC
+0x7fc4216a9760	TCPv4	10.42.85.115	51003	72.21.91.29	80	CLOSED	-	-	N/A
+0x7fc426581e40	UDPv4	0.0.0.0	0	*	0		1096	svchost.exe	2020-09-19 05:09:15.000000 UTC
+0x7fc426581e40	UDPv6	::	0	*	0		1096	svchost.exe	2020-09-19 05:09:15.000000 UTC
+0x7fc42fcf0be0	TCPv4	0.0.0.0	3389	0.0.0.0	0	LISTENING	520	svchost.exe	2020-09-19 01:24:09.000000 UTC
+0x7fca1f1d85e0	UDPv4	0.0.0.0	16512	*	0		2684	svchost.exe	2020-09-19 03:13:22.000000 UTC
+0x7fca216a9760	TCPv4	10.42.85.115	51003	72.21.91.29	80	CLOSED	-	-	N/A
+0x7fca26581e40	UDPv4	0.0.0.0	0	*	0		1096	svchost.exe	2020-09-19 05:09:15.000000 UTC
+0
+... (truncated; full output in the run folder)</pre>      </div>
+      <div>
+        <div class="excerpt-path">
+          cite <a href="#ledger-10">seq 10</a>
+          &middot; <span class="mono">fs_list</span>
+&middot; <span class="mono">outputs/0009_fs_list.txt</span>        </div>
+<pre>d/d 19518-144-1:	Documents and Settings	2013-08-22 14:48:41 (UTC)	2013-08-22 14:48:41 (UTC)	2020-09-17 16:47:59 (UTC)	2013-08-22 14:48:41 (UTC)	48	0	0
+d/d 183-144-6:	ProgramData	2020-09-17 18:05:45 (UTC)	2020-09-17 18:05:45 (UTC)	2020-09-17 18:05:45 (UTC)	2013-08-22 13:36:16 (UTC)	56	0	0
+d/d 249-144-5:	Users	2020-09-17 16:46:15 (UTC)	2020-09-17 16:46:15 (UTC)	2020-09-17 16:46:15 (UTC)	2013-08-22 13:36:16 (UTC)	56	0	0
+d/d 58-144-1:	PerfLogs	2013-08-22 15:52:33 (UTC)	2013-08-22 15:52:33 (UTC)	2020-09-17 16:50:47 (UTC)	2013-08-22 15:39:30 (UTC)	48	0	0
+r/r 4-128-4:	$AttrDef	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2560	0	48
+r/r 8-128-2:	$BadClus	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	0	0	0
+r/r 8-128-1:	$BadClus:$Bad	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	11710492672	0	0
+r/r 6-128-4:	$Bitmap	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	357376	0	0
+r/r 7-128-1:	$Boot	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UT
+... (truncated; full output in the run folder)</pre>      </div>
+      <div>
+        <div class="excerpt-path">
+          cite <a href="#ledger-19">seq 19</a>
+          &middot; <span class="mono">fs_list</span>
+&middot; <span class="mono">outputs/0018_fs_list.txt</span>        </div>
+<pre>d/d 19518-144-1:	Documents and Settings	2013-08-22 14:48:41 (UTC)	2013-08-22 14:48:41 (UTC)	2020-09-17 16:47:59 (UTC)	2013-08-22 14:48:41 (UTC)	48	0	0
+d/d 183-144-6:	ProgramData	2020-09-17 18:05:45 (UTC)	2020-09-17 18:05:45 (UTC)	2020-09-17 18:05:45 (UTC)	2013-08-22 13:36:16 (UTC)	56	0	0
+d/d 249-144-5:	Users	2020-09-17 16:46:15 (UTC)	2020-09-17 16:46:15 (UTC)	2020-09-17 16:46:15 (UTC)	2013-08-22 13:36:16 (UTC)	56	0	0
+d/d 58-144-1:	PerfLogs	2013-08-22 15:52:33 (UTC)	2013-08-22 15:52:33 (UTC)	2020-09-17 16:50:47 (UTC)	2013-08-22 15:39:30 (UTC)	48	0	0
+r/r 4-128-4:	$AttrDef	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2560	0	48
+r/r 8-128-2:	$BadClus	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	0	0	0
+r/r 8-128-1:	$BadClus:$Bad	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	11710492672	0	0
+r/r 6-128-4:	$Bitmap	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	357376	0	0
+r/r 7-128-1:	$Boot	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UT
+... (truncated; full output in the run folder)</pre>      </div>
+    <h4 style="margin:.8rem 0 .2rem; font-size:.92rem;">Verifier's reproduction note</h4>
+    <p>All three cited queries reproduced with matching SHA-256s: netscan confirms ESTABLISHED TCPv4 10.42.85.115:50957→10.42.85.10:445; fs_list confirms FileShare at inode 86963 created 2020-09-19 03:34:18 UTC; and fs_list /FileShare shows identical inodes to the drive root (junction looping to /), directly corroborating the DC C: drive share mapping claim.</p>
+  </div>
+  <div class="finding" id="F-005">
+    <div class="finding-head">
+      <h3 style="margin:.6rem 0 0">F-005</h3>
+      <span class="sev sev-critical">critical</span>
+      <span class="verdict verdict-VERIFIED">VERIFIED</span>
+      <span class="mono muted">T1550.003</span>
+    </div>
+    <p>CITADEL-DC01 security log shows C137\\Administrator made multiple Kerberos Type 3 (network) logons from source IP 10.42.85.115 (DESKTOP-SDN1RPT workstation) at 2020-09-19T03:36:24 UTC. The attacker used domain Administrator credentials from the workstation to authenticate to the domain controller, arriving just 2 minutes after the FileShare was created on DC01 and 4 minutes before coreupdater.exe executed.</p>
+    <h4 style="margin:.6rem 0 .2rem; font-size:.92rem;">Evidence</h4>
+      <div>
+        <div class="excerpt-path">
+          cite <a href="#ledger-168">seq 168</a>
+          &middot; <span class="mono">evtx_query</span>
+&middot; <span class="mono">outputs/0167_evtx_query.jsonl</span>        </div>
+<pre>﻿{&#34;PayloadData1&#34;:&#34;&#34;,&#34;MapDescription&#34;:&#34;Windows is starting up&#34;,&#34;ChunkNumber&#34;:0,&#34;Computer&#34;:&#34;WIN-HRJHA99CCDO&#34;,&#34;Payload&#34;:&#34;{\&#34;EventData\&#34;:\&#34;\&#34;}&#34;,&#34;Channel&#34;:&#34;Security&#34;,&#34;Provider&#34;:&#34;Microsoft-Windows-Security-Auditing&#34;,&#34;EventId&#34;:4608,&#34;EventRecordId&#34;:&#34;1&#34;,&#34;ProcessId&#34;:488,&#34;ThreadId&#34;:492,&#34;Level&#34;:&#34;LogAlways&#34;,&#34;Keywords&#34;:&#34;Audit success&#34;,&#34;SourceFile&#34;:&#34;/home/sansforensics/verdict/runs/20260613T165313Z/artifacts/inode_84706&#34;,&#34;ExtraDataOffset&#34;:0,&#34;HiddenRecord&#34;:false,&#34;TimeCreated&#34;:&#34;2020-09-17T15:51:52.7443527+00:00&#34;,&#34;RecordNumber&#34;:1}
+{&#34;PayloadData1&#34;:&#34;Target: NT AUTHORITY\\SYSTEM&#34;,&#34;PayloadData2&#34;:&#34;LogonType 0&#34;,&#34;PayloadData3&#34;:&#34;LogonId: 0x3E7&#34;,&#34;PayloadData4&#34;:&#34;AuthenticationPackageName: -&#34;,&#34;PayloadData5&#34;:&#34;LogonProcessName: -&#34;,&#34;UserName&#34;:&#34;-\\-&#34;,&#34;RemoteHost&#34;:&#34;- (-)&#34;,&#34;ExecutableInfo&#34;:&#34;&#34;,&#34;MapDescription&#34;:&#34;Successful logon&#34;,&#34;ChunkNumber&#34;:0,&#34;Computer&#34;:&#34;WIN-HRJHA99CCDO&#34;,&#34;Payload&#34;:&#34;{\&#34;EventData\&#34;:{\&#34;Data\&#34;:[{\&#34;@Name\&#34;:\&#34;SubjectUserSid\&#34;,\&#34;#text\&#34;:\&#34;S-1-0-0\&#34;},{\&#34;@Name\&#34;:\&#34;SubjectUserName\&#34;,\&#34;#text\&#34;:\&#34;-\&#34;},{\&#34;@Name\&#34;:\&#34;SubjectDomainName\&#34;,\&#34;#text\&#34;:\&#34;-\&#34;},{\&#34;@Name\&#34;:\&#34;SubjectLogonId\&#34;,\&#34;#text\&#34;:\&#34;0x0\&#34;},{\&#34;@Name\&#34;:\&#34;TargetUserSid\&#34;,\&#34;#text\&#34;:\&#34;S-1-5-18\&#34;},{\&#34;@Name\&#34;:\&#34;TargetUserName\&#34;,\&#34;#text\&#34;:\&#34;SYSTEM\&#34;},{\&#34;@Name
+... (truncated; full output in the run folder)</pre>      </div>
+      <div>
+        <div class="excerpt-path">
+          cite <a href="#ledger-10">seq 10</a>
+          &middot; <span class="mono">fs_list</span>
+&middot; <span class="mono">outputs/0009_fs_list.txt</span>        </div>
+<pre>d/d 19518-144-1:	Documents and Settings	2013-08-22 14:48:41 (UTC)	2013-08-22 14:48:41 (UTC)	2020-09-17 16:47:59 (UTC)	2013-08-22 14:48:41 (UTC)	48	0	0
+d/d 183-144-6:	ProgramData	2020-09-17 18:05:45 (UTC)	2020-09-17 18:05:45 (UTC)	2020-09-17 18:05:45 (UTC)	2013-08-22 13:36:16 (UTC)	56	0	0
+d/d 249-144-5:	Users	2020-09-17 16:46:15 (UTC)	2020-09-17 16:46:15 (UTC)	2020-09-17 16:46:15 (UTC)	2013-08-22 13:36:16 (UTC)	56	0	0
+d/d 58-144-1:	PerfLogs	2013-08-22 15:52:33 (UTC)	2013-08-22 15:52:33 (UTC)	2020-09-17 16:50:47 (UTC)	2013-08-22 15:39:30 (UTC)	48	0	0
+r/r 4-128-4:	$AttrDef	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2560	0	48
+r/r 8-128-2:	$BadClus	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	0	0	0
+r/r 8-128-1:	$BadClus:$Bad	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	11710492672	0	0
+r/r 6-128-4:	$Bitmap	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	357376	0	0
+r/r 7-128-1:	$Boot	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UTC)	2020-09-17 16:47:52 (UT
+... (truncated; full output in the run folder)</pre>      </div>
+      <div>
+        <div class="excerpt-path">
+          cite <a href="#ledger-87">seq 87</a>
+          &middot; <span class="mono">mem_analyze</span>
+&middot; <span class="mono">outputs/0086_mem_analyze.txt</span>        </div>
+<pre>Volatility 3 Framework 2.28.0
+
+PID	PPID	ImageFileName	Offset(V)	Threads	Handles	SessionId	Wow64	CreateTime	ExitTime	File output
+
+3388	616	svchost.exe	0x7f8318124080	6	-	2	False	2020-09-19 05:08:19.000000 UTC	N/A	Disabled
+3388	616	svchost.exe	0x7f9518124080	6	-	2	False	2020-09-19 05:08:19.000000 UTC	N/A	Disabled
+3388	616	svchost.exe	0x7fb800128080	6	-	2	False	2020-09-19 05:08:19.000000 UTC	N/A	Disabled
+5896	5204	explorer.exe	0x7fb801ad1080	75	-	2	False	2020-09-19 05:08:16.000000 UTC	N/A	Disabled
+2208	616	svchost.exe	0x7fb801b49240	1	-	0	False	2020-09-19 01:26:11.000000 UTC	N/A	Disabled
+8416	764	WmiPrvSE.exe	0x7fb804ec12c0	7	-	0	False	2020-09-19 05:09:13.000000 UTC	N/A	Disabled
+7852	764	RuntimeBroker.	0x7fb80cd60080	7	-	2	False	2020-09-19 05:08:59.000000 UTC	N/A	Disabled
+312	4	smss.exe	0x7fb80f898040	2	-	N/A	False	2020-09-19 01:24:07.000000 UTC	N/A	Disabled
+3232	448	sihost.exe	0x7fb819451080	20	-	2	False	2020-09-19 05:08:15.000000 UTC	N/A	Disabled
+3232	448	sihost.exe	0x7fb81ce29080	20	-	2	False	2020-09-19 05:08:15.000000 UTC	N/A	Disabled
+8984	3708	SearchFilterHo	0x7fb829528080	1	-	0	False	2020-09-19 05:08:18.000000 UTC	N/A	Disabled
+8416	764	WmiPrvSE.exe	0x7fb82a0102c0	7	-	0	False	202
+... (truncated; full output in the run folder)</pre>      </div>
+    <h4 style="margin:.8rem 0 .2rem; font-size:.92rem;">Verifier's reproduction note</h4>
+    <p>All three cited queries reproduced with exact SHA matches: Security log confirms multiple Kerberos LogonType=3 events for C137\Administrator from 10.42.85.115 at 03:36:24 UTC; fs_list confirms FileShare created at 03:34:18 UTC (~2 min earlier); psscan confirms coreupdater.exe started at 03:40:49 UTC (~4 min later).</p>
+  </div>
+  <div class="finding" id="F-006">
+    <div class="finding-head">
+      <h3 style="margin:.6rem 0 0">F-006</h3>
+      <span class="sev sev-high">high</span>
+      <span class="verdict verdict-VERIFIED">VERIFIED</span>
+      <span class="mono muted">T1210</span>
+    </div>
+    <p>CITADEL-DC01&#39;s spoolsv.exe crashed with exception code c0000005 (ACCESS_VIOLATION, fault module StackHash_1e37) at 2020-09-19 03:29:35 UTC — approximately 5 minutes before the FileShare directory was created. This timing suggests a potential print spooler exploitation attempt or printer bug abuse on the DC immediately preceding lateral movement.</p>
+    <h4 style="margin:.6rem 0 .2rem; font-size:.92rem;">Evidence</h4>
+      <div>
+        <div class="excerpt-path">
+          cite <a href="#ledger-66">seq 66</a>
+          &middot; <span class="mono">mft_query</span>
+&middot; <span class="mono">outputs/0065_mft_query.csv</span>        </div>
+<pre>MFTECmd version 1.3.0.0
+
+Author: Eric Zimmerman (saericzimmerman@gmail.com)
+https://github.com/EricZimmerman/MFTECmd
+
+Command line: -f /home/sansforensics/verdict/runs/20260613T165313Z/artifacts/inode_0 --csv /home/sansforensics/verdict/runs/20260613T165313Z/scratch
+
+File type: Mft
+
+Processed /home/sansforensics/verdict/runs/20260613T165313Z/artifacts/inode_0 in 4.1235 seconds
+
+/home/sansforensics/verdict/runs/20260613T165313Z/artifacts/inode_0: FILE records found: 87,135 (Free records: 5) File size: 85.2MB
+	CSV output will be saved to /home/sansforensics/verdict/runs/20260613T165313Z/scratch/20260613171023_MFTECmd_$MFT_Output.csv</pre>      </div>
+      <div>
+        <div class="excerpt-path">
+          cite <a href="#ledger-184">seq 184</a>
+          &middot; <span class="mono">read_artifact</span>
+&middot; <span class="mono">outputs/0183_read_artifact.json</span>        </div>
+<pre>{
+  &#34;path&#34;: &#34;artifacts/inode_87072&#34;,
+  &#34;file_size&#34;: 12544,
+  &#34;offset&#34;: 0,
+  &#34;returned_bytes&#34;: 4096,
+  &#34;eof&#34;: false,
+  &#34;mode&#34;: &#34;text&#34;,
+  &#34;content&#34;: &#34;V\u0000e\u0000r\u0000s\u0000i\u0000o\u0000n\u0000=\u00001\u0000\r\u0000\n\u0000E\u0000v\u0000e\u0000n\u0000t\u0000T\u0000y\u0000p\u0000e\u0000=\u0000A\u0000P\u0000P\u0000C\u0000R\u0000A\u0000S\u0000H\u0000\r\u0000\n\u0000E\u0000v\u0000e\u0000n\u0000t\u0000T\u0000i\u0000m\u0000e\u0000=\u00001\u00003\u00002\u00004\u00004\u00009\u00005\u00009\u00007\u00007\u00005\u00009\u00000\u00006\u00008\u00005\u00003\u00009\u0000\r\u0000\n\u0000R\u0000e\u0000p\u0000o\u0000r\u0000t\u0000T\u0000y\u0000p\u0000e\u0000=\u00002\u0000\r\u0000\n\u0000C\u0000o\u0000n\u0000s\u0000e\u0000n\u0000t\u0000=\u00001\u0000\r\u0000\n\u0000R\u0000e\u0000p\u0000o\u0000r\u0000t\u0000I\u0000d\u0000e\u0000n\u0000t\u0000i\u0000f\u0000i\u0000e\u0000r\u0000=\u00005\u00006\u0000b\u00007\u0000e\u0000a\u0000b\u00009\u0000-\u0000f\u0000a\u00002\u00008\u0000-\u00001\u00001\u0000e\u0000a\u0000-\u00008\u00000\u0000b\u0000f\u0000-\u00000\u00000\u00000\u0000c\u00002\u00009\u0000e\u00001\u00008\u00004\u0000e\u00006\u0000\r\u0000\n\u0000I\u0000n\u0000t\u0000e\u0000g\u0000r\u0000a\u0000t\u0
+... (truncated; full output in the run folder)</pre>      </div>
+    <h4 style="margin:.8rem 0 .2rem; font-size:.92rem;">Verifier's reproduction note</h4>
+    <p>WER report inode_87072 (SHA matched exactly) contains EventType=APPCRASH, NsAppName=spoolsv.exe, Fault Module=StackHash_1e37, ExceptionCode=c0000005, created at 2020-09-19 03:29:35 per MFT — all claim specifics confirmed in raw artifact content.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Appendix A &mdash; Refuted findings</h2>
+  <p class="muted">Triage hypotheses the adversarial verifier reproduced and broke. Their presence here is proof the self-correction fired &mdash; they were kept out of the headline findings above.</p>
+    <div class="finding" id="F-001">
+      <div class="finding-head">
+        <h3 style="margin:.6rem 0 0">F-001</h3>
+        <span class="sev sev-critical">critical</span>
+        <span class="verdict verdict-REFUTED">REFUTED</span>
+        <span class="mono muted">T1055</span>
+      </div>
+      <p><strong>Claim (refuted):</strong> A process named coreupdater.exe (PID 8324, PPID 4008) was running on DESKTOP-SDN1RPT and actively hidden from the Windows process list via DKOM (Direct Kernel Object Manipulation). It appeared in physical memory scan (psscan) but not in the standard process tree (pstree), ran from 2020-09-19 03:40:49 UTC to 03:43:10 UTC, and is not a legitimate Windows binary.</p>
+      <p><strong>Refutation:</strong> coreupdater.exe (PID 8324) appears in the pstree output as an orphaned top-level entry, directly contradicting the DKOM claim that it was hidden from pstree and visible only in psscan.</p>
+<p class="muted">Cited evidence:
+<a href="#ledger-6">seq 6</a>, <a href="#ledger-87">seq 87</a>      </p>    </div>
+    <div class="finding" id="F-004">
+      <div class="finding-head">
+        <h3 style="margin:.6rem 0 0">F-004</h3>
+        <span class="sev sev-critical">critical</span>
+        <span class="verdict verdict-REFUTED">REFUTED</span>
+        <span class="mono muted">T1078.002</span>
+      </div>
+      <p><strong>Claim (refuted):</strong> DC01 (WIN-E0PO207ERMD.C137.local) shows C137\\Administrator logged in interactively (logon type 7) at 2020-09-18T03:41:57 UTC with full SeDebugPrivilege and backup/restore rights. This logon coincides precisely with coreupdater.exe running on the workstation (03:40:49–03:43:10 UTC) and the creation of the FileShare directory (03:34:18 UTC), suggesting the attacker had active control of the DC Administrator account at this time.</p>
+      <p><strong>Refutation:</strong> The DC Administrator logon is 2020-09-18T03:41:57 UTC, but coreupdater.exe ran 2020-09-19T03:40:49–03:43:10 UTC and FileShare was created 2020-09-19T03:34:18 UTC — all three events are ~24 hours apart, directly contradicting the claim that they &#34;coincide precisely.&#34;</p>
+<p class="muted">Cited evidence:
+<a href="#ledger-146">seq 146</a>, <a href="#ledger-10">seq 10</a>, <a href="#ledger-87">seq 87</a>      </p>    </div>
+</section>
+
+<section>
+  <h2>Appendix B &mdash; Evidence inventory</h2>
+  <table>
+    <thead><tr><th>File</th><th>Type</th><th>Size (bytes)</th><th>SHA-256</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="mono">.extracted-DC01-E01.zip</td>
+        <td>other</td>
+        <td>0</td>
+        <td class="mono" style="word-break:break-all">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</td>
+      </tr>
+      <tr>
+        <td class="mono">.extracted-DC01-ProtectedFiles.zip</td>
+        <td>other</td>
+        <td>0</td>
+        <td class="mono" style="word-break:break-all">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</td>
+      </tr>
+      <tr>
+        <td class="mono">.extracted-DC01-autorunsc.zip</td>
+        <td>other</td>
+        <td>0</td>
+        <td class="mono" style="word-break:break-all">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</td>
+      </tr>
+      <tr>
+        <td class="mono">.extracted-DC01-memory.zip</td>
+        <td>other</td>
+        <td>0</td>
+        <td class="mono" style="word-break:break-all">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</td>
+      </tr>
+      <tr>
+        <td class="mono">.extracted-DC01-pagefile.zip</td>
+        <td>other</td>
+        <td>0</td>
+        <td class="mono" style="word-break:break-all">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</td>
+      </tr>
+      <tr>
+        <td class="mono">.extracted-DESKTOP-E01.zip</td>
+        <td>other</td>
+        <td>0</td>
+        <td class="mono" style="word-break:break-all">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</td>
+      </tr>
+      <tr>
+        <td class="mono">.extracted-DESKTOP-SDN1RPT-Protected_Files.zip</td>
+        <td>other</td>
+        <td>0</td>
+        <td class="mono" style="word-break:break-all">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</td>
+      </tr>
+      <tr>
+        <td class="mono">.extracted-DESKTOP-SDN1RPT-autorunsc.zip</td>
+        <td>other</td>
+        <td>0</td>
+        <td class="mono" style="word-break:break-all">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</td>
+      </tr>
+      <tr>
+        <td class="mono">.extracted-DESKTOP-SDN1RPT-memory.zip</td>
+        <td>other</td>
+        <td>0</td>
+        <td class="mono" style="word-break:break-all">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</td>
+      </tr>
+      <tr>
+        <td class="mono">.extracted-Desktop-SDN1RPT-pagefile.zip</td>
+        <td>other</td>
+        <td>0</td>
+        <td class="mono" style="word-break:break-all">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</td>
+      </tr>
+      <tr>
+        <td class="mono">.extracted-case001-pcap.zip</td>
+        <td>other</td>
+        <td>0</td>
+        <td class="mono" style="word-break:break-all">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</td>
+      </tr>
+      <tr>
+        <td class="mono">20200918_0417_DESKTOP-SDN1RPT.E01</td>
+        <td>disk_image</td>
+        <td>2147291154</td>
+        <td class="mono" style="word-break:break-all">3976e5d7280ea945a23d2136bde6c85a19e8ce638ef7bcacede863bbef843c42</td>
+      </tr>
+      <tr>
+        <td class="mono">20200918_0417_DESKTOP-SDN1RPT.E01.txt</td>
+        <td>other</td>
+        <td>1608</td>
+        <td class="mono" style="word-break:break-all">6eafe246269b02390d028388d95fb908511f63bcb52f87aa505fb4a5a47c4229</td>
+      </tr>
+      <tr>
+        <td class="mono">20200918_0417_DESKTOP-SDN1RPT.E02</td>
+        <td>other</td>
+        <td>2147330394</td>
+        <td class="mono" style="word-break:break-all">9b9006ec9ef76f434f5e2e9ae91f646dc201e32350e2904e8018bf6739e635b6</td>
+      </tr>
+      <tr>
+        <td class="mono">20200918_0417_DESKTOP-SDN1RPT.E03</td>
+        <td>other</td>
+        <td>2147392052</td>
+        <td class="mono" style="word-break:break-all">25e827f02e81d5a44f5fea425e33d5788f4042b62aac1bacb88686e4f03ec4c6</td>
+      </tr>
+      <tr>
+        <td class="mono">20200918_0417_DESKTOP-SDN1RPT.E04</td>
+        <td>other</td>
+        <td>422953421</td>
+        <td class="mono" style="word-break:break-all">f48ae8669fc166045e8da9b7877de02883a42ed1380b5a4e74d20a0e39457929</td>
+      </tr>
+      <tr>
+        <td class="mono">DC01-E01.zip</td>
+        <td>other</td>
+        <td>4836649413</td>
+        <td class="mono" style="word-break:break-all">efe06d12388dbc000fa4ae306746ddaca3893a6cdbd55311b52f5833e717acd9</td>
+      </tr>
+      <tr>
+        <td class="mono">DC01-ProtectedFiles.zip</td>
+        <td>other</td>
+        <td>12297759</td>
+        <td class="mono" style="word-break:break-all">b1f3d42a9629dc25521685f296959c4c6d36bbf2efd355c127cb49171c372424</td>
+      </tr>
+      <tr>
+        <td class="mono">DC01-autorunsc.zip</td>
+        <td>other</td>
+        <td>177298</td>
+        <td class="mono" style="word-break:break-all">2855472b2af6d44bfe00cc7a62c3b467b6aa5a138ba6a4af2600a9c5b58c054f</td>
+      </tr>
+      <tr>
+        <td class="mono">DC01-memory.zip</td>
+        <td>other</td>
+        <td>561424278</td>
+        <td class="mono" style="word-break:break-all">86658d85d8254e8d30dccc4f50d9c2a8b550a101d2e78a6d932316849e37ad80</td>
+      </tr>
+      <tr>
+        <td class="mono">DC01-pagefile.zip</td>
+        <td>other</td>
+        <td>13540216</td>
+        <td class="mono" style="word-break:break-all">b1db1979b290cf5c954c1965c5e7834259bb8e3e88327d7f6d68b20e4c7cd5b9</td>
+      </tr>
+      <tr>
+        <td class="mono">DESKTOP-E01.zip</td>
+        <td>other</td>
+        <td>6843484923</td>
+        <td class="mono" style="word-break:break-all">ade4c11a695bdcbe89d76ca0949ac918456549fcca9e4558502ffc286c8d16ad</td>
+      </tr>
+      <tr>
+        <td class="mono">DESKTOP-SDN1RPT-Protected Files.zip</td>
+        <td>other</td>
+        <td>17127742</td>
+        <td class="mono" style="word-break:break-all">133f01f0abdeccf1d81267f600b004e91ce0a7c99e5ccc8729aa5777e4b26715</td>
+      </tr>
+      <tr>
+        <td class="mono">DESKTOP-SDN1RPT-autorunsc.zip</td>
+        <td>other</td>
+        <td>278645</td>
+        <td class="mono" style="word-break:break-all">e9e86ad993d5c274a9ed6c6aaecc41c8fa051af77828da51ece691a15cd70b9e</td>
+      </tr>
+      <tr>
+        <td class="mono">DESKTOP-SDN1RPT-memory.zip</td>
+        <td>other</td>
+        <td>802767348</td>
+        <td class="mono" style="word-break:break-all">fce1bdd584cd52d7830f7f9a209e960ca151ce174ebdef3fad03205ab7e33d01</td>
+      </tr>
+      <tr>
+        <td class="mono">DESKTOP-SDN1RPT.mem</td>
+        <td>memory_image</td>
+        <td>2147483648</td>
+        <td class="mono" style="word-break:break-all">ac6ee0e8c273103b94d776f54192d2c6acf8303aabbd6a199254030c69f667c3</td>
+      </tr>
+      <tr>
+        <td class="mono">Desktop-SDN1RPT-pagefile.zip</td>
+        <td>other</td>
+        <td>222055350</td>
+        <td class="mono" style="word-break:break-all">a8c62a19e0ceae5955c0b611fef42241bbaa207dd11aa316d293a788adccf957</td>
+      </tr>
+      <tr>
+        <td class="mono">E01-DC01/20200918_0347_CDrive.E01</td>
+        <td>disk_image</td>
+        <td>2524848357</td>
+        <td class="mono" style="word-break:break-all">c0c8fe58dcdb65f6574cb63b34f086856087cfaf06872ed702a4c0c264446bac</td>
+      </tr>
+      <tr>
+        <td class="mono">E01-DC01/20200918_0347_CDrive.E01.txt</td>
+        <td>other</td>
+        <td>1399</td>
+        <td class="mono" style="word-break:break-all">af08169bc8c32b27fbaa85f26646f8c1bb9f5f71f0ee04a759f9064928c8ca79</td>
+      </tr>
+      <tr>
+        <td class="mono">E01-DC01/20200918_0347_CDrive.E02</td>
+        <td>other</td>
+        <td>2347582840</td>
+        <td class="mono" style="word-break:break-all">73f87df9de0fa9ed41c6fdc360f0e15c3d13955e7fd24f5e59a5b2e282d6b384</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected/SAM</td>
+        <td>registry_hive</td>
+        <td>262144</td>
+        <td class="mono" style="word-break:break-all">4c0b68407718679fbd0a85e9c77b0020325ec9300e29ea3feabd569e31382d46</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected/SECURITY</td>
+        <td>registry_hive</td>
+        <td>262144</td>
+        <td class="mono" style="word-break:break-all">58b1e06c1b7e413372e7dadb2b389a704e5b604e4274d657516b247a21fbb2ed</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected/default</td>
+        <td>registry_hive</td>
+        <td>262144</td>
+        <td class="mono" style="word-break:break-all">060bcd638ffb9bb75186fb0d2b01a09a45ee026661aa5adf2d803bc1c4ad224b</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected/ntds.dit</td>
+        <td>other</td>
+        <td>20987904</td>
+        <td class="mono" style="word-break:break-all">90fc6eff4affb4f5f32680ff57158b87be91e547a896d5f2d048c0a05d3fba33</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected/software</td>
+        <td>registry_hive</td>
+        <td>45875200</td>
+        <td class="mono" style="word-break:break-all">9ea369b327a9241abd6ed3f2801218cf342b6b2d2888da3ae72306154062019f</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected/system</td>
+        <td>registry_hive</td>
+        <td>12845056</td>
+        <td class="mono" style="word-break:break-all">34d4f4dcd8591a39a31ee3c40e42b3fde89157d0664d8912d73c483af5e6d334</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/SAM</td>
+        <td>registry_hive</td>
+        <td>65536</td>
+        <td class="mono" style="word-break:break-all">6429738382642740791f9934c5c8a846e697a1871bbf244b5381abfc20883c9c</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/SECURITY</td>
+        <td>registry_hive</td>
+        <td>32768</td>
+        <td class="mono" style="word-break:break-all">43b898b6dd7045c903f7fd6c06f9bf8bf559a0eff2a0803ce8e14d72d25c4d82</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/Admin/Crypto/Keys/de7cf8a7901d2ad13e5c67c29e5d1662_511cefa6-2706-41b2-b1d8-b70acd58c1f3</td>
+        <td>other</td>
+        <td>960</td>
+        <td class="mono" style="word-break:break-all">c94ce1fe3e28082b5c26dddf46c84ab3e271a8b7f3110d28d851f3d83498e903</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/Admin/NTUSER.DAT</td>
+        <td>registry_hive</td>
+        <td>1048576</td>
+        <td class="mono" style="word-break:break-all">38268f36aca98d4420db5bf6113f02589617a45d671919c3c7e8093ae1b7730c</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/Admin/Protect/CREDHIST</td>
+        <td>other</td>
+        <td>24</td>
+        <td class="mono" style="word-break:break-all">aa15ff87250fed7e49f6330fdad44e82352b626049efd14c7f3610b64500bd5e</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/Admin/Protect/S-1-5-21-41211245-796119838-3940169921-1001/Preferred</td>
+        <td>other</td>
+        <td>24</td>
+        <td class="mono" style="word-break:break-all">bf307a9ef06937bc753bb78551181be3ba10ae132dada118658cfdc648921480</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/Admin/Protect/S-1-5-21-41211245-796119838-3940169921-1001/c4b3c548-81e1-4e24-954d-b082d52cdc93</td>
+        <td>other</td>
+        <td>468</td>
+        <td class="mono" style="word-break:break-all">78646316cbe5ff0ac8e68352c13d17bed8166ad639520fd89089c8d1e829ec61</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/Administrator/Crypto/Keys/de7cf8a7901d2ad13e5c67c29e5d1662_511cefa6-2706-41b2-b1d8-b70acd58c1f3</td>
+        <td>other</td>
+        <td>800</td>
+        <td class="mono" style="word-break:break-all">f85dffbf4b54cdea2321a48f9fad80dd7eff010a0b773e7bcf7456d3974455d1</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/Administrator/Crypto/RSA/S-1-5-21-2232410529-1445159330-2725690660-500/a18ca4003deb042bbee7a40f15e1970b_511cefa6-2706-41b2-b1d8-b70acd58c1f3</td>
+        <td>other</td>
+        <td>54</td>
+        <td class="mono" style="word-break:break-all">48e04dc9cf085d5d9696975f13de32e236f154bc9cac7bd3520648abb0b8787a</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/Administrator/NTUSER.DAT</td>
+        <td>registry_hive</td>
+        <td>786432</td>
+        <td class="mono" style="word-break:break-all">f9e815c25182668c9dd6a16611840f88189d7fc90550b3eb719cae223ce65504</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/Administrator/Protect/CREDHIST</td>
+        <td>other</td>
+        <td>24</td>
+        <td class="mono" style="word-break:break-all">42c6a79b7bff4b2dbc279570c1032b64aacf9a923d8bb95b8e7727d0df3a825c</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/Administrator/Protect/S-1-5-21-2232410529-1445159330-2725690660-500/$I30</td>
+        <td>other</td>
+        <td>4096</td>
+        <td class="mono" style="word-break:break-all">6dc1d277973f2ed0d7880848a9bf0ca22014c3ad79fea9a5a1bbca3028c02d4c</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/Administrator/Protect/S-1-5-21-2232410529-1445159330-2725690660-500/BK-C137</td>
+        <td>other</td>
+        <td>900</td>
+        <td class="mono" style="word-break:break-all">35a5f0073f623d87d7786e8854b02df756e8e9305016591b5120ac68943582db</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/Administrator/Protect/S-1-5-21-2232410529-1445159330-2725690660-500/Preferred</td>
+        <td>other</td>
+        <td>24</td>
+        <td class="mono" style="word-break:break-all">a3a5cdfe3102542018a54548812b2e20e6ffce35b04436a537134fe67a061a1f</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/Administrator/Protect/S-1-5-21-2232410529-1445159330-2725690660-500/dd7c4b0d-0d14-410b-8968-80034352e894</td>
+        <td>other</td>
+        <td>740</td>
+        <td class="mono" style="word-break:break-all">3809c381de4df81638792078cac85b74a44e6deade35b8bed9f772002ad47c3c</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/Administrator/Protect/SYNCHIST</td>
+        <td>other</td>
+        <td>76</td>
+        <td class="mono" style="word-break:break-all">21111eba64c512bda4ceb6f21e5f6c6eb3f4c50e0f5e3b0cb3ba5b8aa99227c3</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/Default/NTUSER.DAT</td>
+        <td>registry_hive</td>
+        <td>262144</td>
+        <td class="mono" style="word-break:break-all">85db19d1a9e9dd2a38119fb60abf49cd9076f80c4513ec12729d8ed91dbe4170</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/mortysmith/Crypto/Keys/de7cf8a7901d2ad13e5c67c29e5d1662_511cefa6-2706-41b2-b1d8-b70acd58c1f3</td>
+        <td>other</td>
+        <td>800</td>
+        <td class="mono" style="word-break:break-all">6f93b1854301afa5e1ae66800f033676d84ea2061621f1d4ffed9c0b464b7ebe</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/mortysmith/NTUSER.DAT</td>
+        <td>registry_hive</td>
+        <td>1048576</td>
+        <td class="mono" style="word-break:break-all">fc40d527fc20e3e7526339b9bcf33a2cb35be33baa63913afed2c915b4a8a1ee</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/mortysmith/Protect/CREDHIST</td>
+        <td>other</td>
+        <td>24</td>
+        <td class="mono" style="word-break:break-all">528569125424aacc0ffa8f173b54ee1f0c0e18f5afea2af4ab0f0f645ef6a0c7</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/mortysmith/Protect/S-1-5-21-2232410529-1445159330-2725690660-1108/$I30</td>
+        <td>other</td>
+        <td>4096</td>
+        <td class="mono" style="word-break:break-all">00974e03947d83d206f0aae2535165b7470f8f18640933198ee0035481850ffd</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/mortysmith/Protect/S-1-5-21-2232410529-1445159330-2725690660-1108/4316b6e8-b4da-4365-ba72-738b8a40c5d2</td>
+        <td>other</td>
+        <td>740</td>
+        <td class="mono" style="word-break:break-all">940404237046c6a1e9b30485db3dbd8c72697f2a5b19d55dc3537bb7a2697b22</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/mortysmith/Protect/S-1-5-21-2232410529-1445159330-2725690660-1108/BK-C137</td>
+        <td>other</td>
+        <td>900</td>
+        <td class="mono" style="word-break:break-all">6e842caf7bfe8a840bb43b92e9bd7fa4065a65b76e1962ae2f13f1d243720084</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/mortysmith/Protect/S-1-5-21-2232410529-1445159330-2725690660-1108/Preferred</td>
+        <td>other</td>
+        <td>24</td>
+        <td class="mono" style="word-break:break-all">1e0c8f06c1fdaa27bbd6de505ee53163355e82b3ee676bffbb2260ab99d30a09</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/mortysmith/Protect/SYNCHIST</td>
+        <td>other</td>
+        <td>76</td>
+        <td class="mono" style="word-break:break-all">a04b801f172cfb61b3ed1b5941757cde2ce2204dece32b9854361f8692f7f07b</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/ricksanchez/Crypto/Keys/de7cf8a7901d2ad13e5c67c29e5d1662_511cefa6-2706-41b2-b1d8-b70acd58c1f3</td>
+        <td>other</td>
+        <td>800</td>
+        <td class="mono" style="word-break:break-all">8462338bf19c516544844ceb7d438decd3105ca9c2fe804e7156b1bb9a0b231a</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/ricksanchez/Crypto/RSA/S-1-5-21-2232410529-1445159330-2725690660-1106/3c512c1628e49a3625c0147daa36453e_511cefa6-2706-41b2-b1d8-b70acd58c1f3</td>
+        <td>other</td>
+        <td>52</td>
+        <td class="mono" style="word-break:break-all">aac609feb7fdde1ffc85b12be8cc54f0ce200812c2f3c1e2ee0b15d57931554c</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/ricksanchez/NTUSER.DAT</td>
+        <td>registry_hive</td>
+        <td>1048576</td>
+        <td class="mono" style="word-break:break-all">1d826d616b4fb1324b7412e46405a40190bb11f5b0336eb2a9af195d6f9f062f</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/ricksanchez/Protect/CREDHIST</td>
+        <td>other</td>
+        <td>24</td>
+        <td class="mono" style="word-break:break-all">33f8a58868b3e6ab319c0fdda0168e2291b5fa5a7a07eb9a881fcb01dbaf7999</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/ricksanchez/Protect/S-1-5-21-2232410529-1445159330-2725690660-1106/$I30</td>
+        <td>other</td>
+        <td>4096</td>
+        <td class="mono" style="word-break:break-all">e54bb44e1592a2565dabd88cbedc4be1c351408b626c856305d69171ef3a2b0c</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/ricksanchez/Protect/S-1-5-21-2232410529-1445159330-2725690660-1106/1b0cd33b-e5d5-44fc-882e-84856c66fb3a</td>
+        <td>other</td>
+        <td>740</td>
+        <td class="mono" style="word-break:break-all">fed797b24b8be23c7f804755be3cfaa355c5ae5a8fd33f64a8ebde079884af8c</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/ricksanchez/Protect/S-1-5-21-2232410529-1445159330-2725690660-1106/5854f04d-930d-41e8-a752-ddadb8c2ba4c</td>
+        <td>other</td>
+        <td>740</td>
+        <td class="mono" style="word-break:break-all">8fe2dcc54de276c7d3c56ff83bf3bf6abbce600b97e1e88a3d99d82808e1fe6d</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/ricksanchez/Protect/S-1-5-21-2232410529-1445159330-2725690660-1106/BK-C137</td>
+        <td>other</td>
+        <td>900</td>
+        <td class="mono" style="word-break:break-all">1c555d097d62f7c42503621378dd310b1fe2b4802a60ea965e91bc3c9aab89df</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/ricksanchez/Protect/S-1-5-21-2232410529-1445159330-2725690660-1106/Preferred</td>
+        <td>other</td>
+        <td>24</td>
+        <td class="mono" style="word-break:break-all">1aa7b7907e0e4d4bc4b66e0dc3a5ec07374a308a4e9cf242d07849b0a8c6b44e</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/Users/ricksanchez/Protect/SYNCHIST</td>
+        <td>other</td>
+        <td>76</td>
+        <td class="mono" style="word-break:break-all">86da9f3cb211eb1155922001aef2ee3fe9e95c89dd18d42f7a46d32604027012</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/default</td>
+        <td>registry_hive</td>
+        <td>524288</td>
+        <td class="mono" style="word-break:break-all">db4b925b5f700a50bce40a08ddb9192ebb43020108583640e8e01ced4df42cf8</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/software</td>
+        <td>registry_hive</td>
+        <td>68681728</td>
+        <td class="mono" style="word-break:break-all">4f61461d38e5f56e1c3aa0605b07929c810fe7e45655c3129179412bd6feb7c4</td>
+      </tr>
+      <tr>
+        <td class="mono">Protected Files/system</td>
+        <td>registry_hive</td>
+        <td>13369344</td>
+        <td class="mono" style="word-break:break-all">1d52d3ac890dd7c1dc65106122a6115d0895dc475b2c9033a5f9db798a50950b</td>
+      </tr>
+      <tr>
+        <td class="mono">SHA256SUMS.txt</td>
+        <td>other</td>
+        <td>971</td>
+        <td class="mono" style="word-break:break-all">e378d779784420feae47ac319411de1f0dd866585feab1d38cd2282916aa8712</td>
+      </tr>
+      <tr>
+        <td class="mono">Users/Administrator/Crypto/RSA/S-1-5-21-2232410529-1445159330-2725690660-500/$I30</td>
+        <td>other</td>
+        <td>4096</td>
+        <td class="mono" style="word-break:break-all">6fec5ed89b7b9aeea87c1b18543a6cc45bfb5bf8f49f67207f4cc9a87688146c</td>
+      </tr>
+      <tr>
+        <td class="mono">Users/Administrator/Crypto/RSA/S-1-5-21-2232410529-1445159330-2725690660-500/a18ca4003deb042bbee7a40f15e1970b_4b4ea8ce-0ec8-44d8-ba9d-fc256d5fb3e3</td>
+        <td>other</td>
+        <td>54</td>
+        <td class="mono" style="word-break:break-all">48e04dc9cf085d5d9696975f13de32e236f154bc9cac7bd3520648abb0b8787a</td>
+      </tr>
+      <tr>
+        <td class="mono">Users/Administrator/Crypto/RSA/S-1-5-21-2232410529-1445159330-2725690660-500/a76f2ec683a33d12f825424a3ff971cb_4b4ea8ce-0ec8-44d8-ba9d-fc256d5fb3e3</td>
+        <td>other</td>
+        <td>2081</td>
+        <td class="mono" style="word-break:break-all">0d68cdadc4f8436fd34e4a0af07424550ca962b4ce153c15f1ef8d40608ae568</td>
+      </tr>
+      <tr>
+        <td class="mono">Users/Administrator/NTUSER.DAT</td>
+        <td>registry_hive</td>
+        <td>524288</td>
+        <td class="mono" style="word-break:break-all">b3370e3722b5216938fd23ba9f659a137500a51ed700b9fe85da8bbfaa8a4a97</td>
+      </tr>
+      <tr>
+        <td class="mono">Users/Administrator/Protect/CREDHIST</td>
+        <td>other</td>
+        <td>24</td>
+        <td class="mono" style="word-break:break-all">7dfe64b28fd6eeb34b9559521b36ec543c47d11a7df6962bcc205adbf8613b0e</td>
+      </tr>
+      <tr>
+        <td class="mono">Users/Administrator/Protect/S-1-5-21-2232410529-1445159330-2725690660-500/$I30</td>
+        <td>other</td>
+        <td>4096</td>
+        <td class="mono" style="word-break:break-all">f70158b94d505ef4e5a81958c716738a24c42d4a27dbab335873896333d2f922</td>
+      </tr>
+      <tr>
+        <td class="mono">Users/Administrator/Protect/S-1-5-21-2232410529-1445159330-2725690660-500/2bce9fae-ba21-48cf-af7b-6173960b827a</td>
+        <td>other</td>
+        <td>740</td>
+        <td class="mono" style="word-break:break-all">146656707eaf04905f78756b83681ab6d51d37709a25b63c190b93feb8e51382</td>
+      </tr>
+      <tr>
+        <td class="mono">Users/Administrator/Protect/S-1-5-21-2232410529-1445159330-2725690660-500/BK-C137</td>
+        <td>other</td>
+        <td>900</td>
+        <td class="mono" style="word-break:break-all">4092b986fe43eb18bffcafd3b3b6d1fb4514b70eed948b30daea316b2d777707</td>
+      </tr>
+      <tr>
+        <td class="mono">Users/Administrator/Protect/S-1-5-21-2232410529-1445159330-2725690660-500/Preferred</td>
+        <td>other</td>
+        <td>24</td>
+        <td class="mono" style="word-break:break-all">1a2dd3e7e397b400c4e84799844e1a47be88a77a57acfdb1e693e0f56ae1ba56</td>
+      </tr>
+      <tr>
+        <td class="mono">Users/Administrator/Protect/SYNCHIST</td>
+        <td>other</td>
+        <td>76</td>
+        <td class="mono" style="word-break:break-all">528e42e000b111d0487b615b3b78d9ac72c221030098906903b97a58db048f9c</td>
+      </tr>
+      <tr>
+        <td class="mono">Users/Default/NTUSER.DAT</td>
+        <td>registry_hive</td>
+        <td>262144</td>
+        <td class="mono" style="word-break:break-all">060a25027a5dbd4019d4d17b998acd22d6235bb6250a1d744524f55901247080</td>
+      </tr>
+      <tr>
+        <td class="mono">autoruns-desktop-sdn1rpt.csv</td>
+        <td>other</td>
+        <td>1620736</td>
+        <td class="mono" style="word-break:break-all">04c7de1fa5924ac927add5e6719e781ca76496b3e9004cc33ae38975e4aa0a98</td>
+      </tr>
+      <tr>
+        <td class="mono">autorunsc-citadel-dc01.csv</td>
+        <td>other</td>
+        <td>1068150</td>
+        <td class="mono" style="word-break:break-all">2a2ea03644569ad8cbb183189938ae5a1551af82cf5fe4e6b49b81bb04b78482</td>
+      </tr>
+      <tr>
+        <td class="mono">case001-pcap.zip</td>
+        <td>other</td>
+        <td>151610116</td>
+        <td class="mono" style="word-break:break-all">ea8eee228cdf82b1f534a2daab88dfb1d928d2ef2d5b469c189242d8c901f0ec</td>
+      </tr>
+      <tr>
+        <td class="mono">case001.pcap</td>
+        <td>pcap</td>
+        <td>197583252</td>
+        <td class="mono" style="word-break:break-all">09abf49efea1852e047987d92907704d47f36d75f6c8056e2cafa6cc027791cb</td>
+      </tr>
+      <tr>
+        <td class="mono">citadel-dco1-pagefile.sys</td>
+        <td>other</td>
+        <td>1207959552</td>
+        <td class="mono" style="word-break:break-all">10545373c23c72b86e4987983a3d4c21f9ab57c475b904b5927cb184c43a67ed</td>
+      </tr>
+      <tr>
+        <td class="mono">citadeldc01.mem</td>
+        <td>memory_image</td>
+        <td>2147483648</td>
+        <td class="mono" style="word-break:break-all">8079a7459b1739caf7d4fbf6dde5eb0ae7a9d24dbde657debf4d5202c8dc6b62</td>
+      </tr>
+      <tr>
+        <td class="mono">pagefile.sys</td>
+        <td>other</td>
+        <td>1207959552</td>
+        <td class="mono" style="word-break:break-all">f45738a2f85e1aed41340fc952718ac9517b5442338bd85e397e438212c3d43c</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Appendix C &mdash; Tool-call index (audit ledger)</h2>
+  <p class="muted">Every ledger event, in order. Each tool result is anchored
+    <span class="mono">ledger-&lt;seq&gt;</span> &mdash; the citations above jump here.
+    The ledger is written by the server only (single writer); this is a faithful rendering of <span class="mono">ledger.jsonl</span>.</p>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#1</span>
+    <span class="mono">2026-06-13T16:53:14.574Z</span>
+    <strong>run_started</strong>
+<span class="muted">{&#34;case_dir&#34;: &#34;/cases/szechuan&#34;, &#34;budget_usd&#34;: 5.0, &#34;model&#34;: &#34;claude-sonnet-4-6&#34;}</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#2</span>
+    <span class="mono">2026-06-13T16:53:14.597Z</span>
+    <strong>tool_called</strong>
+<span class="mono">evidence_inventory</span>  </div>
+  <div class="ledger-entry" id="ledger-3">
+    <span class="ledger-seq">#3</span>
+    <span class="mono">2026-06-13T17:05:25.121Z</span>
+    <strong>tool_result</strong>
+<span class="mono">evidence_inventory</span><span class="muted">sha=7e89f53e2737... · outputs/0002_evidence_inventory.json · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#4</span>
+    <span class="mono">2026-06-13T17:05:37.765Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0417 (cumulative $0.0417)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#5</span>
+    <span class="mono">2026-06-13T17:05:41.322Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mem_analyze</span><span class="muted">{&#34;image&#34;: &#34;DESKTOP-SDN1RPT.mem&#34;, &#34;plugin&#34;: &#34;pstree&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-6">
+    <span class="ledger-seq">#6</span>
+    <span class="mono">2026-06-13T17:05:44.920Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mem_analyze</span><span class="muted">sha=994c6ae154a2... · outputs/0005_mem_analyze.txt · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#7</span>
+    <span class="mono">2026-06-13T17:05:45.984Z</span>
+    <strong>tool_called</strong>
+<span class="mono">fs_list</span><span class="muted">{&#34;probe&#34;: &#34;mmls&#34;, &#34;image&#34;: &#34;20200918_0347_CDrive.E01&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-8">
+    <span class="ledger-seq">#8</span>
+    <span class="mono">2026-06-13T17:05:46.065Z</span>
+    <strong>tool_result</strong>
+<span class="mono">fs_list</span><span class="muted">sha=4fe7b5bb3236... · outputs/0007_fs_list.txt · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#9</span>
+    <span class="mono">2026-06-13T17:05:46.066Z</span>
+    <strong>tool_called</strong>
+<span class="mono">fs_list</span><span class="muted">{&#34;image&#34;: &#34;E01-DC01/20200918_0347_CDrive.E01&#34;, &#34;path&#34;: &#34;/&#34;, &#34;recursive&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-10">
+    <span class="ledger-seq">#10</span>
+    <span class="mono">2026-06-13T17:05:47.036Z</span>
+    <strong>tool_result</strong>
+<span class="mono">fs_list</span><span class="muted">sha=6c781f6041be... · outputs/0009_fs_list.txt · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#11</span>
+    <span class="mono">2026-06-13T17:05:47.053Z</span>
+    <strong>tool_called</strong>
+<span class="mono">fs_list</span><span class="muted">{&#34;probe&#34;: &#34;mmls&#34;, &#34;image&#34;: &#34;20200918_0417_DESKTOP-SDN1RPT.E01&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-12">
+    <span class="ledger-seq">#12</span>
+    <span class="mono">2026-06-13T17:05:48.504Z</span>
+    <strong>tool_result</strong>
+<span class="mono">fs_list</span><span class="muted">sha=b60d2017e050... · outputs/0011_fs_list.txt · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#13</span>
+    <span class="mono">2026-06-13T17:05:48.506Z</span>
+    <strong>tool_called</strong>
+<span class="mono">fs_list</span><span class="muted">{&#34;image&#34;: &#34;20200918_0417_DESKTOP-SDN1RPT.E01&#34;, &#34;path&#34;: &#34;/&#34;, &#34;recursive&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-14">
+    <span class="ledger-seq">#14</span>
+    <span class="mono">2026-06-13T17:05:48.626Z</span>
+    <strong>tool_result</strong>
+<span class="mono">fs_list</span><span class="muted">sha=e3b0c44298fc... · outputs/0013_fs_list.txt · exit=1</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#15</span>
+    <span class="mono">2026-06-13T17:06:02.406Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0790 (cumulative $0.1207)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#16</span>
+    <span class="mono">2026-06-13T17:06:02.422Z</span>
+    <strong>tool_called</strong>
+<span class="mono">read_artifact</span><span class="muted">{&#34;path&#34;: &#34;outputs/0005_mem_analyze.txt&#34;, &#34;offset&#34;: 4096, &#34;length&#34;: 8192, &#34;mode&#34;: &#34;text&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-17">
+    <span class="ledger-seq">#17</span>
+    <span class="mono">2026-06-13T17:06:02.427Z</span>
+    <strong>tool_result</strong>
+<span class="mono">read_artifact</span><span class="muted">sha=7477a382fced... · outputs/0016_read_artifact.json · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#18</span>
+    <span class="mono">2026-06-13T17:06:02.440Z</span>
+    <strong>tool_called</strong>
+<span class="mono">fs_list</span><span class="muted">{&#34;image&#34;: &#34;E01-DC01/20200918_0347_CDrive.E01&#34;, &#34;path&#34;: &#34;/FileShare&#34;, &#34;recursive&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-19">
+    <span class="ledger-seq">#19</span>
+    <span class="mono">2026-06-13T17:06:03.360Z</span>
+    <strong>tool_result</strong>
+<span class="mono">fs_list</span><span class="muted">sha=6c781f6041be... · outputs/0018_fs_list.txt · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#20</span>
+    <span class="mono">2026-06-13T17:06:03.385Z</span>
+    <strong>tool_called</strong>
+<span class="mono">fs_list</span><span class="muted">{&#34;image&#34;: &#34;20200918_0417_DESKTOP-SDN1RPT.E01&#34;, &#34;path&#34;: &#34;/Windows/System32&#34;, &#34;partition_offset&#34;: 1048576, &#34;recursive&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-21">
+    <span class="ledger-seq">#21</span>
+    <span class="mono">2026-06-13T17:06:03.590Z</span>
+    <strong>tool_result</strong>
+<span class="mono">fs_list</span><span class="muted">sha=e3b0c44298fc... · outputs/0020_fs_list.txt · exit=1</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#22</span>
+    <span class="mono">2026-06-13T17:06:27.698Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0756 (cumulative $0.1963)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#23</span>
+    <span class="mono">2026-06-13T17:06:27.720Z</span>
+    <strong>tool_called</strong>
+<span class="mono">fs_extract</span><span class="muted">{&#34;image&#34;: &#34;E01-DC01/20200918_0347_CDrive.E01&#34;, &#34;target&#34;: &#34;/Windows/System32/winevt/Logs/Security.evtx&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-24">
+    <span class="ledger-seq">#24</span>
+    <span class="mono">2026-06-13T17:06:27.741Z</span>
+    <strong>tool_result</strong>
+<span class="mono">fs_extract</span><span class="muted">sha=e3b0c44298fc... · outputs/0023_fs_extract.txt · exit=1</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#25</span>
+    <span class="mono">2026-06-13T17:06:27.771Z</span>
+    <strong>tool_called</strong>
+<span class="mono">fs_extract</span><span class="muted">{&#34;image&#34;: &#34;E01-DC01/20200918_0347_CDrive.E01&#34;, &#34;target&#34;: &#34;/Windows/System32/winevt/Logs/System.evtx&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-26">
+    <span class="ledger-seq">#26</span>
+    <span class="mono">2026-06-13T17:06:27.790Z</span>
+    <strong>tool_result</strong>
+<span class="mono">fs_extract</span><span class="muted">sha=e3b0c44298fc... · outputs/0025_fs_extract.txt · exit=1</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#27</span>
+    <span class="mono">2026-06-13T17:06:36.142Z</span>
+    <strong>tool_called</strong>
+<span class="mono">registry_query</span><span class="muted">{&#34;hive&#34;: &#34;Protected/system&#34;, &#34;plugin&#34;: &#34;services&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-28">
+    <span class="ledger-seq">#28</span>
+    <span class="mono">2026-06-13T17:06:42.028Z</span>
+    <strong>tool_result</strong>
+<span class="mono">registry_query</span><span class="muted">sha=ba3078da033e... · outputs/0027_registry_query.txt · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#29</span>
+    <span class="mono">2026-06-13T17:06:50.769Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0272 (cumulative $0.2236)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#30</span>
+    <span class="mono">2026-06-13T17:06:50.788Z</span>
+    <strong>tool_called</strong>
+<span class="mono">fs_list</span><span class="muted">{&#34;image&#34;: &#34;E01-DC01/20200918_0347_CDrive.E01&#34;, &#34;path&#34;: &#34;/Windows/System32/winevt/Logs&#34;, &#34;recursive&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-31">
+    <span class="ledger-seq">#31</span>
+    <span class="mono">2026-06-13T17:06:51.849Z</span>
+    <strong>tool_result</strong>
+<span class="mono">fs_list</span><span class="muted">sha=6c781f6041be... · outputs/0030_fs_list.txt · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#32</span>
+    <span class="mono">2026-06-13T17:06:51.867Z</span>
+    <strong>tool_called</strong>
+<span class="mono">fs_list</span><span class="muted">{&#34;image&#34;: &#34;E01-DC01/20200918_0347_CDrive.E01&#34;, &#34;path&#34;: &#34;/Users&#34;, &#34;recursive&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-33">
+    <span class="ledger-seq">#33</span>
+    <span class="mono">2026-06-13T17:06:53.183Z</span>
+    <strong>tool_result</strong>
+<span class="mono">fs_list</span><span class="muted">sha=6c781f6041be... · outputs/0032_fs_list.txt · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#34</span>
+    <span class="mono">2026-06-13T17:07:14.725Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0856 (cumulative $0.3092)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#35</span>
+    <span class="mono">2026-06-13T17:07:14.747Z</span>
+    <strong>tool_called</strong>
+<span class="mono">registry_query</span><span class="muted">{&#34;hive&#34;: &#34;Protected Files/Users/Admin/NTUSER.DAT&#34;, &#34;plugin&#34;: &#34;run_keys&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-36">
+    <span class="ledger-seq">#36</span>
+    <span class="mono">2026-06-13T17:07:15.397Z</span>
+    <strong>tool_result</strong>
+<span class="mono">registry_query</span><span class="muted">sha=e8cfec13f997... · outputs/0035_registry_query.txt · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#37</span>
+    <span class="mono">2026-06-13T17:07:15.411Z</span>
+    <strong>tool_called</strong>
+<span class="mono">registry_query</span><span class="muted">{&#34;hive&#34;: &#34;Protected Files/SAM&#34;, &#34;plugin&#34;: &#34;sam_users&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-38">
+    <span class="ledger-seq">#38</span>
+    <span class="mono">2026-06-13T17:07:15.996Z</span>
+    <strong>tool_result</strong>
+<span class="mono">registry_query</span><span class="muted">sha=e8cfec13f997... · outputs/0037_registry_query.txt · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#39</span>
+    <span class="mono">2026-06-13T17:07:16.008Z</span>
+    <strong>tool_called</strong>
+<span class="mono">registry_query</span><span class="muted">{&#34;hive&#34;: &#34;Protected/SAM&#34;, &#34;plugin&#34;: &#34;sam_users&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-40">
+    <span class="ledger-seq">#40</span>
+    <span class="mono">2026-06-13T17:07:17.390Z</span>
+    <strong>tool_result</strong>
+<span class="mono">registry_query</span><span class="muted">sha=4e8b762a9707... · outputs/0039_registry_query.txt · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#41</span>
+    <span class="mono">2026-06-13T17:07:33.805Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0414 (cumulative $0.3506)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#42</span>
+    <span class="mono">2026-06-13T17:07:33.835Z</span>
+    <strong>tool_called</strong>
+<span class="mono">fs_extract</span><span class="muted">{&#34;image&#34;: &#34;E01-DC01/20200918_0347_CDrive.E01&#34;, &#34;target&#34;: &#34;0&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-43">
+    <span class="ledger-seq">#43</span>
+    <span class="mono">2026-06-13T17:07:35.928Z</span>
+    <strong>tool_result</strong>
+<span class="mono">fs_extract</span><span class="muted">sha=5a091208f515... · outputs/0042_fs_extract.bin · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#44</span>
+    <span class="mono">2026-06-13T17:07:36.507Z</span>
+    <strong>tool_called</strong>
+<span class="mono">timeline_query</span><span class="muted">{&#34;image&#34;: &#34;E01-DC01/20200918_0347_CDrive.E01&#34;, &#34;after&#34;: &#34;2020-09-18 00:00:00&#34;, &#34;before&#34;: &#34;2020-09-19 10:00:00&#34;, &#34;keyword&#34;: &#34;Users&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-45">
+    <span class="ledger-seq">#45</span>
+    <span class="mono">2026-06-13T17:08:11.776Z</span>
+    <strong>tool_result</strong>
+<span class="mono">timeline_query</span><span class="muted">sha=4b0e05b39b2f... · outputs/0044_timeline_query.body · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#46</span>
+    <span class="mono">2026-06-13T17:08:11.875Z</span>
+    <strong>tool_called</strong>
+<span class="mono">timeline_query</span><span class="muted">{&#34;image&#34;: &#34;E01-DC01/20200918_0347_CDrive.E01&#34;, &#34;after&#34;: &#34;2020-09-18 00:00:00&#34;, &#34;before&#34;: &#34;2020-09-19 10:00:00&#34;, &#34;keyword&#34;: &#34;Users&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-47">
+    <span class="ledger-seq">#47</span>
+    <span class="mono">2026-06-13T17:08:14.610Z</span>
+    <strong>tool_result</strong>
+<span class="mono">timeline_query</span><span class="muted">sha=49be0e2518f3... · outputs/0046_timeline_query.txt · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#48</span>
+    <span class="mono">2026-06-13T17:08:25.059Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0439 (cumulative $0.3946)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#49</span>
+    <span class="mono">2026-06-13T17:08:28.366Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mft_query</span><span class="muted">{&#34;mft_path&#34;: &#34;artifacts/inode_0&#34;, &#34;path_contains&#34;: &#34;mimikatz&#34;, &#34;deleted_only&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-50">
+    <span class="ledger-seq">#50</span>
+    <span class="mono">2026-06-13T17:08:35.810Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mft_query</span><span class="muted">sha=3d5264bc12b1... · outputs/0049_mft_query.csv · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#51</span>
+    <span class="mono">2026-06-13T17:08:39.974Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mft_query</span><span class="muted">{&#34;mft_path&#34;: &#34;artifacts/inode_0&#34;, &#34;path_contains&#34;: &#34;psexec&#34;, &#34;deleted_only&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-52">
+    <span class="ledger-seq">#52</span>
+    <span class="mono">2026-06-13T17:08:46.939Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mft_query</span><span class="muted">sha=64921e56e946... · outputs/0051_mft_query.csv · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#53</span>
+    <span class="mono">2026-06-13T17:08:51.279Z</span>
+    <strong>tool_called</strong>
+<span class="mono">timeline_query</span><span class="muted">{&#34;image&#34;: &#34;E01-DC01/20200918_0347_CDrive.E01&#34;, &#34;after&#34;: &#34;2020-09-18 00:00:00&#34;, &#34;before&#34;: &#34;2020-09-19 10:00:00&#34;, &#34;keyword&#34;: &#34;Administrator&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-54">
+    <span class="ledger-seq">#54</span>
+    <span class="mono">2026-06-13T17:08:53.599Z</span>
+    <strong>tool_result</strong>
+<span class="mono">timeline_query</span><span class="muted">sha=49be0e2518f3... · outputs/0053_timeline_query.txt · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#55</span>
+    <span class="mono">2026-06-13T17:09:04.830Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0459 (cumulative $0.4404)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#56</span>
+    <span class="mono">2026-06-13T17:09:06.811Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mft_query</span><span class="muted">{&#34;mft_path&#34;: &#34;artifacts/inode_0&#34;, &#34;path_contains&#34;: &#34;ntds&#34;, &#34;deleted_only&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-57">
+    <span class="ledger-seq">#57</span>
+    <span class="mono">2026-06-13T17:09:14.045Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mft_query</span><span class="muted">sha=26226fb72089... · outputs/0056_mft_query.csv · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#58</span>
+    <span class="mono">2026-06-13T17:09:22.645Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mft_query</span><span class="muted">{&#34;mft_path&#34;: &#34;artifacts/inode_0&#34;, &#34;path_contains&#34;: &#34;.ps1&#34;, &#34;after&#34;: &#34;2020-09-17 00:00:00&#34;, &#34;deleted_only&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-59">
+    <span class="ledger-seq">#59</span>
+    <span class="mono">2026-06-13T17:09:29.727Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mft_query</span><span class="muted">sha=551c598341f1... · outputs/0058_mft_query.csv · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#60</span>
+    <span class="mono">2026-06-13T17:09:38.114Z</span>
+    <strong>tool_called</strong>
+<span class="mono">timeline_query</span><span class="muted">{&#34;image&#34;: &#34;E01-DC01/20200918_0347_CDrive.E01&#34;, &#34;after&#34;: &#34;2020-09-18 03:00:00&#34;, &#34;before&#34;: &#34;2020-09-19 10:00:00&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-61">
+    <span class="ledger-seq">#61</span>
+    <span class="mono">2026-06-13T17:09:40.477Z</span>
+    <strong>tool_result</strong>
+<span class="mono">timeline_query</span><span class="muted">sha=49be0e2518f3... · outputs/0060_timeline_query.txt · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#62</span>
+    <span class="mono">2026-06-13T17:09:52.667Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0619 (cumulative $0.5023)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#63</span>
+    <span class="mono">2026-06-13T17:09:54.676Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mft_query</span><span class="muted">{&#34;mft_path&#34;: &#34;artifacts/inode_0&#34;, &#34;path_contains&#34;: &#34;Windows\\\\NTDS\\\\&#34;, &#34;after&#34;: &#34;2020-09-17 00:00:00&#34;, &#34;deleted_only&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-64">
+    <span class="ledger-seq">#64</span>
+    <span class="mono">2026-06-13T17:10:01.989Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mft_query</span><span class="muted">sha=12382bc1f7f7... · outputs/0063_mft_query.csv · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#65</span>
+    <span class="mono">2026-06-13T17:10:17.643Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mft_query</span><span class="muted">{&#34;mft_path&#34;: &#34;artifacts/inode_0&#34;, &#34;path_contains&#34;: &#34;ProgramData&#34;, &#34;after&#34;: &#34;2020-09-18 00:00:00&#34;, &#34;deleted_only&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-66">
+    <span class="ledger-seq">#66</span>
+    <span class="mono">2026-06-13T17:10:28.060Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mft_query</span><span class="muted">sha=ded792aefa3a... · outputs/0065_mft_query.csv · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#67</span>
+    <span class="mono">2026-06-13T17:10:41.004Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mem_analyze</span><span class="muted">{&#34;image&#34;: &#34;DESKTOP-SDN1RPT.mem&#34;, &#34;plugin&#34;: &#34;cmdline&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-68">
+    <span class="ledger-seq">#68</span>
+    <span class="mono">2026-06-13T17:10:43.442Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mem_analyze</span><span class="muted">sha=21bf7fbeade5... · outputs/0067_mem_analyze.txt · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#69</span>
+    <span class="mono">2026-06-13T17:10:56.666Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0577 (cumulative $0.5600)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#70</span>
+    <span class="mono">2026-06-13T17:10:56.680Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mem_analyze</span><span class="muted">{&#34;image&#34;: &#34;DESKTOP-SDN1RPT.mem&#34;, &#34;plugin&#34;: &#34;netscan&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-71">
+    <span class="ledger-seq">#71</span>
+    <span class="mono">2026-06-13T17:12:37.884Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mem_analyze</span><span class="muted">sha=cbe39c195337... · outputs/0070_mem_analyze.txt · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#72</span>
+    <span class="mono">2026-06-13T17:12:37.901Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mem_analyze</span><span class="muted">{&#34;image&#34;: &#34;DESKTOP-SDN1RPT.mem&#34;, &#34;plugin&#34;: &#34;malfind&#34;, &#34;filter&#34;: &#34;coreupdater&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-73">
+    <span class="ledger-seq">#73</span>
+    <span class="mono">2026-06-13T17:17:00.998Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mem_analyze</span><span class="muted">sha=e827dbd4a18b... · outputs/0072_mem_analyze.txt · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#74</span>
+    <span class="mono">2026-06-13T17:17:02.794Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mft_query</span><span class="muted">{&#34;mft_path&#34;: &#34;artifacts/inode_0&#34;, &#34;path_contains&#34;: &#34;coreupdater&#34;, &#34;deleted_only&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-75">
+    <span class="ledger-seq">#75</span>
+    <span class="mono">2026-06-13T17:17:10.795Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mft_query</span><span class="muted">sha=64d87cfeb025... · outputs/0074_mft_query.csv · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#76</span>
+    <span class="mono">2026-06-13T17:17:42.409Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.3514 (cumulative $0.9113)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#77</span>
+    <span class="mono">2026-06-13T17:17:42.427Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mem_analyze</span><span class="muted">{&#34;image&#34;: &#34;DESKTOP-SDN1RPT.mem&#34;, &#34;plugin&#34;: &#34;netscan&#34;, &#34;filter&#34;: &#34;coreupdater&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-78">
+    <span class="ledger-seq">#78</span>
+    <span class="mono">2026-06-13T17:19:11.620Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mem_analyze</span><span class="muted">sha=cbe39c195337... · outputs/0077_mem_analyze.txt · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#79</span>
+    <span class="mono">2026-06-13T17:19:11.638Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mem_analyze</span><span class="muted">{&#34;image&#34;: &#34;DESKTOP-SDN1RPT.mem&#34;, &#34;plugin&#34;: &#34;dlllist&#34;, &#34;filter&#34;: &#34;coreupdater&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-80">
+    <span class="ledger-seq">#80</span>
+    <span class="mono">2026-06-13T17:19:20.775Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mem_analyze</span><span class="muted">sha=b31cf4910d47... · outputs/0079_mem_analyze.txt · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#81</span>
+    <span class="mono">2026-06-13T17:19:20.793Z</span>
+    <strong>tool_called</strong>
+<span class="mono">timeline_query</span><span class="muted">{&#34;image&#34;: &#34;20200918_0417_DESKTOP-SDN1RPT.E01&#34;, &#34;after&#34;: &#34;2020-09-18 00:00:00&#34;, &#34;before&#34;: &#34;2020-09-20 00:00:00&#34;, &#34;keyword&#34;: &#34;coreupdater&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-82">
+    <span class="ledger-seq">#82</span>
+    <span class="mono">2026-06-13T17:19:20.973Z</span>
+    <strong>tool_result</strong>
+<span class="mono">timeline_query</span><span class="muted">sha=e3b0c44298fc... · outputs/0081_timeline_query.body · exit=1</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#83</span>
+    <span class="mono">2026-06-13T17:19:38.092Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0411 (cumulative $0.9524)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#84</span>
+    <span class="mono">2026-06-13T17:19:38.115Z</span>
+    <strong>tool_called</strong>
+<span class="mono">read_artifact</span><span class="muted">{&#34;path&#34;: &#34;20200918_0417_DESKTOP-SDN1RPT.E01.txt&#34;, &#34;offset&#34;: 0, &#34;length&#34;: 1608, &#34;mode&#34;: &#34;text&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-85">
+    <span class="ledger-seq">#85</span>
+    <span class="mono">2026-06-13T17:19:38.118Z</span>
+    <strong>tool_result</strong>
+<span class="mono">read_artifact</span><span class="muted">sha=7a9911ec7dfb... · outputs/0084_read_artifact.json · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#86</span>
+    <span class="mono">2026-06-13T17:19:38.140Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mem_analyze</span><span class="muted">{&#34;image&#34;: &#34;DESKTOP-SDN1RPT.mem&#34;, &#34;plugin&#34;: &#34;psscan&#34;, &#34;filter&#34;: &#34;coreupdater&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-87">
+    <span class="ledger-seq">#87</span>
+    <span class="mono">2026-06-13T17:21:12.342Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mem_analyze</span><span class="muted">sha=3f1026c88e5e... · outputs/0086_mem_analyze.txt · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#88</span>
+    <span class="mono">2026-06-13T17:21:49.075Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0609 (cumulative $1.0133)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#89</span>
+    <span class="mono">2026-06-13T17:21:49.145Z</span>
+    <strong>finding_recorded</strong>
+<span class="muted">F-001: A process named coreupdater.exe (PID 8324, PPID 4008) was running on DESKTOP-SDN1RPT and actively hidden from the Window</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#90</span>
+    <span class="mono">2026-06-13T17:21:49.165Z</span>
+    <strong>tool_called</strong>
+<span class="mono">timeline_query</span><span class="muted">{&#34;image&#34;: &#34;20200918_0417_DESKTOP-SDN1RPT.E01&#34;, &#34;after&#34;: &#34;2020-09-18 00:00:00&#34;, &#34;before&#34;: &#34;2020-09-20 00:00:00&#34;, &#34;keyword&#34;: &#34;coreupdater&#34;, &#34;partition_offset&#34;: 1048576}</span>  </div>
+  <div class="ledger-entry" id="ledger-91">
+    <span class="ledger-seq">#91</span>
+    <span class="mono">2026-06-13T17:21:49.294Z</span>
+    <strong>tool_result</strong>
+<span class="mono">timeline_query</span><span class="muted">sha=e3b0c44298fc... · outputs/0090_timeline_query.body · exit=1</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#92</span>
+    <span class="mono">2026-06-13T17:22:13.709Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0559 (cumulative $1.0692)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#93</span>
+    <span class="mono">2026-06-13T17:22:13.734Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mem_analyze</span><span class="muted">{&#34;image&#34;: &#34;DESKTOP-SDN1RPT.mem&#34;, &#34;plugin&#34;: &#34;psscan&#34;, &#34;filter&#34;: &#34;4008&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-94">
+    <span class="ledger-seq">#94</span>
+    <span class="mono">2026-06-13T17:23:57.907Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mem_analyze</span><span class="muted">sha=3f1026c88e5e... · outputs/0093_mem_analyze.txt · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#95</span>
+    <span class="mono">2026-06-13T17:23:57.921Z</span>
+    <strong>tool_called</strong>
+<span class="mono">registry_query</span><span class="muted">{&#34;hive&#34;: &#34;Protected Files/Users/Administrator/NTUSER.DAT&#34;, &#34;plugin&#34;: &#34;run_keys&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-96">
+    <span class="ledger-seq">#96</span>
+    <span class="mono">2026-06-13T17:23:58.696Z</span>
+    <strong>tool_result</strong>
+<span class="mono">registry_query</span><span class="muted">sha=e8cfec13f997... · outputs/0095_registry_query.txt · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#97</span>
+    <span class="mono">2026-06-13T17:23:58.709Z</span>
+    <strong>tool_called</strong>
+<span class="mono">fs_list</span><span class="muted">{&#34;image&#34;: &#34;E01-DC01/20200918_0347_CDrive.E01&#34;, &#34;path&#34;: &#34;/Windows/System32/spool/drivers&#34;, &#34;recursive&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-98">
+    <span class="ledger-seq">#98</span>
+    <span class="mono">2026-06-13T17:23:59.694Z</span>
+    <strong>tool_result</strong>
+<span class="mono">fs_list</span><span class="muted">sha=6c781f6041be... · outputs/0097_fs_list.txt · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#99</span>
+    <span class="mono">2026-06-13T17:24:20.516Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0818 (cumulative $1.1509)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#100</span>
+    <span class="mono">2026-06-13T17:24:20.539Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mem_analyze</span><span class="muted">{&#34;image&#34;: &#34;DESKTOP-SDN1RPT.mem&#34;, &#34;plugin&#34;: &#34;psscan&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-101">
+    <span class="ledger-seq">#101</span>
+    <span class="mono">2026-06-13T17:25:55.946Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mem_analyze</span><span class="muted">sha=3f1026c88e5e... · outputs/0100_mem_analyze.txt · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#102</span>
+    <span class="mono">2026-06-13T17:25:55.968Z</span>
+    <strong>tool_called</strong>
+<span class="mono">fs_extract</span><span class="muted">{&#34;image&#34;: &#34;E01-DC01/20200918_0347_CDrive.E01&#34;, &#34;target&#34;: &#34;86963&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-103">
+    <span class="ledger-seq">#103</span>
+    <span class="mono">2026-06-13T17:25:56.289Z</span>
+    <strong>tool_result</strong>
+<span class="mono">fs_extract</span><span class="muted">sha=2942cff1f581... · outputs/0102_fs_extract.bin · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#104</span>
+    <span class="mono">2026-06-13T17:26:13.401Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0727 (cumulative $1.2236)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#105</span>
+    <span class="mono">2026-06-13T17:26:13.424Z</span>
+    <strong>tool_called</strong>
+<span class="mono">read_artifact</span><span class="muted">{&#34;path&#34;: &#34;outputs/0100_mem_analyze.txt&#34;, &#34;offset&#34;: 6000, &#34;length&#34;: 8192, &#34;mode&#34;: &#34;text&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-106">
+    <span class="ledger-seq">#106</span>
+    <span class="mono">2026-06-13T17:26:13.427Z</span>
+    <strong>tool_result</strong>
+<span class="mono">read_artifact</span><span class="muted">sha=57f31cdc172a... · outputs/0105_read_artifact.json · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#107</span>
+    <span class="mono">2026-06-13T17:26:13.689Z</span>
+    <strong>tool_called</strong>
+<span class="mono">yara_scan</span><span class="muted">{&#34;target&#34;: &#34;DESKTOP-SDN1RPT.mem&#34;, &#34;ruleset&#34;: &#34;smoke&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-108">
+    <span class="ledger-seq">#108</span>
+    <span class="mono">2026-06-13T17:26:30.590Z</span>
+    <strong>tool_result</strong>
+<span class="mono">yara_scan</span><span class="muted">sha=e3b0c44298fc... · outputs/0107_yara_scan.txt · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#109</span>
+    <span class="mono">2026-06-13T17:26:40.337Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0682 (cumulative $1.2918)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#110</span>
+    <span class="mono">2026-06-13T17:26:40.358Z</span>
+    <strong>tool_called</strong>
+<span class="mono">read_artifact</span><span class="muted">{&#34;path&#34;: &#34;outputs/0100_mem_analyze.txt&#34;, &#34;offset&#34;: 14000, &#34;length&#34;: 8192, &#34;mode&#34;: &#34;text&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-111">
+    <span class="ledger-seq">#111</span>
+    <span class="mono">2026-06-13T17:26:40.360Z</span>
+    <strong>tool_result</strong>
+<span class="mono">read_artifact</span><span class="muted">sha=ff47a8dc774f... · outputs/0110_read_artifact.json · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#112</span>
+    <span class="mono">2026-06-13T17:27:12.739Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0698 (cumulative $1.3616)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#113</span>
+    <span class="mono">2026-06-13T17:27:12.757Z</span>
+    <strong>finding_recorded</strong>
+<span class="muted">F-002: On DESKTOP-SDN1RPT, powershell.exe (PID 508, PPID 1380) spawned a second powershell.exe (PID 3316, PPID 508) at 2020-09-</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#114</span>
+    <span class="mono">2026-06-13T17:27:12.774Z</span>
+    <strong>finding_recorded</strong>
+<span class="muted">F-003: DESKTOP-SDN1RPT had an ESTABLISHED TCP connection from 10.42.85.115:50957 to 10.42.85.10:445 (SMB) at time of memory cap</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#115</span>
+    <span class="mono">2026-06-13T17:27:15.063Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mft_query</span><span class="muted">{&#34;mft_path&#34;: &#34;artifacts/inode_0&#34;, &#34;path_contains&#34;: &#34;Security.evtx&#34;, &#34;deleted_only&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-116">
+    <span class="ledger-seq">#116</span>
+    <span class="mono">2026-06-13T17:27:26.777Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mft_query</span><span class="muted">sha=59aa5a12dc85... · outputs/0115_mft_query.csv · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#117</span>
+    <span class="mono">2026-06-13T17:27:58.905Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0505 (cumulative $1.4121)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#118</span>
+    <span class="mono">2026-06-13T17:28:03.264Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mft_query</span><span class="muted">{&#34;mft_path&#34;: &#34;artifacts/inode_0&#34;, &#34;path_contains&#34;: &#34;.evtx&#34;, &#34;deleted_only&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-119">
+    <span class="ledger-seq">#119</span>
+    <span class="mono">2026-06-13T17:28:13.327Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mft_query</span><span class="muted">sha=f4bd5e3b3fec... · outputs/0118_mft_query.csv · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#120</span>
+    <span class="mono">2026-06-13T17:28:36.204Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mft_query</span><span class="muted">{&#34;mft_path&#34;: &#34;artifacts/inode_0&#34;, &#34;path_contains&#34;: &#34;Desktop&#34;, &#34;after&#34;: &#34;2020-09-18 00:00:00&#34;, &#34;deleted_only&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-121">
+    <span class="ledger-seq">#121</span>
+    <span class="mono">2026-06-13T17:28:45.091Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mft_query</span><span class="muted">sha=e4c0c990c5aa... · outputs/0120_mft_query.csv · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#122</span>
+    <span class="mono">2026-06-13T17:29:19.680Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0453 (cumulative $1.4574)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#123</span>
+    <span class="mono">2026-06-13T17:29:21.630Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mft_query</span><span class="muted">{&#34;mft_path&#34;: &#34;artifacts/inode_0&#34;, &#34;path_contains&#34;: &#34;evtx&#34;, &#34;deleted_only&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-124">
+    <span class="ledger-seq">#124</span>
+    <span class="mono">2026-06-13T17:29:31.031Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mft_query</span><span class="muted">sha=bcdb7320e4a5... · outputs/0123_mft_query.csv · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#125</span>
+    <span class="mono">2026-06-13T17:30:10.078Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mft_query</span><span class="muted">{&#34;mft_path&#34;: &#34;artifacts/inode_0&#34;, &#34;path_contains&#34;: &#34;winevt&#34;, &#34;deleted_only&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-126">
+    <span class="ledger-seq">#126</span>
+    <span class="mono">2026-06-13T17:30:22.678Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mft_query</span><span class="muted">sha=d95294310bc1... · outputs/0125_mft_query.csv · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#127</span>
+    <span class="mono">2026-06-13T17:31:07.209Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0681 (cumulative $1.5254)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#128</span>
+    <span class="mono">2026-06-13T17:31:07.229Z</span>
+    <strong>tool_called</strong>
+<span class="mono">fs_extract</span><span class="muted">{&#34;image&#34;: &#34;E01-DC01/20200918_0347_CDrive.E01&#34;, &#34;target&#34;: &#34;991&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-129">
+    <span class="ledger-seq">#129</span>
+    <span class="mono">2026-06-13T17:31:07.510Z</span>
+    <strong>tool_result</strong>
+<span class="mono">fs_extract</span><span class="muted">sha=94a1cbdf541d... · outputs/0128_fs_extract.bin · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#130</span>
+    <span class="mono">2026-06-13T17:31:07.540Z</span>
+    <strong>tool_called</strong>
+<span class="mono">fs_extract</span><span class="muted">{&#34;image&#34;: &#34;E01-DC01/20200918_0347_CDrive.E01&#34;, &#34;target&#34;: &#34;84706&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-131">
+    <span class="ledger-seq">#131</span>
+    <span class="mono">2026-06-13T17:31:07.879Z</span>
+    <strong>tool_result</strong>
+<span class="mono">fs_extract</span><span class="muted">sha=91da878de6e5... · outputs/0130_fs_extract.bin · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#132</span>
+    <span class="mono">2026-06-13T17:31:07.930Z</span>
+    <strong>tool_called</strong>
+<span class="mono">fs_extract</span><span class="muted">{&#34;image&#34;: &#34;E01-DC01/20200918_0347_CDrive.E01&#34;, &#34;target&#34;: &#34;23732&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-133">
+    <span class="ledger-seq">#133</span>
+    <span class="mono">2026-06-13T17:31:08.144Z</span>
+    <strong>tool_result</strong>
+<span class="mono">fs_extract</span><span class="muted">sha=74837795cdbd... · outputs/0132_fs_extract.bin · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#134</span>
+    <span class="mono">2026-06-13T17:31:15.454Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0514 (cumulative $1.5768)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#135</span>
+    <span class="mono">2026-06-13T17:31:16.368Z</span>
+    <strong>tool_called</strong>
+<span class="mono">evtx_query</span><span class="muted">{&#34;log&#34;: &#34;artifacts/inode_84706&#34;, &#34;event_ids&#34;: [4624, 4625, 4672, 4648, 4776, 4728, 4732], &#34;after&#34;: &#34;2020-09-18 00:00:00&#34;, &#34;limit&#34;: 50}</span>  </div>
+  <div class="ledger-entry" id="ledger-136">
+    <span class="ledger-seq">#136</span>
+    <span class="mono">2026-06-13T17:31:35.235Z</span>
+    <strong>tool_result</strong>
+<span class="mono">evtx_query</span><span class="muted">sha=848799b825d1... · outputs/0135_evtx_query.jsonl · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#137</span>
+    <span class="mono">2026-06-13T17:31:36.563Z</span>
+    <strong>tool_called</strong>
+<span class="mono">evtx_query</span><span class="muted">{&#34;log&#34;: &#34;artifacts/inode_991&#34;, &#34;limit&#34;: 10}</span>  </div>
+  <div class="ledger-entry" id="ledger-138">
+    <span class="ledger-seq">#138</span>
+    <span class="mono">2026-06-13T17:31:40.348Z</span>
+    <strong>tool_result</strong>
+<span class="mono">evtx_query</span><span class="muted">sha=e526de0e04e9... · outputs/0137_evtx_query.jsonl · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#139</span>
+    <span class="mono">2026-06-13T17:31:49.640Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0653 (cumulative $1.6421)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#140</span>
+    <span class="mono">2026-06-13T17:31:49.658Z</span>
+    <strong>tool_called</strong>
+<span class="mono">evtx_query</span><span class="muted">{&#34;log&#34;: &#34;artifacts/inode_84706&#34;, &#34;event_ids&#34;: [4624, 4625], &#34;after&#34;: &#34;2020-09-18 03:00:00&#34;, &#34;keyword&#34;: &#34;LogonType&#34;, &#34;limit&#34;: 50}</span>  </div>
+  <div class="ledger-entry" id="ledger-141">
+    <span class="ledger-seq">#141</span>
+    <span class="mono">2026-06-13T17:32:02.125Z</span>
+    <strong>tool_result</strong>
+<span class="mono">evtx_query</span><span class="muted">sha=848799b825d1... · outputs/0140_evtx_query.jsonl · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#142</span>
+    <span class="mono">2026-06-13T17:32:02.779Z</span>
+    <strong>tool_called</strong>
+<span class="mono">evtx_query</span><span class="muted">{&#34;log&#34;: &#34;artifacts/inode_84706&#34;, &#34;event_ids&#34;: [7045, 4698, 4697], &#34;after&#34;: &#34;2020-09-18 00:00:00&#34;, &#34;limit&#34;: 50}</span>  </div>
+  <div class="ledger-entry" id="ledger-143">
+    <span class="ledger-seq">#143</span>
+    <span class="mono">2026-06-13T17:32:15.501Z</span>
+    <strong>tool_result</strong>
+<span class="mono">evtx_query</span><span class="muted">sha=848799b825d1... · outputs/0142_evtx_query.jsonl · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#144</span>
+    <span class="mono">2026-06-13T17:32:25.866Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0637 (cumulative $1.7058)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#145</span>
+    <span class="mono">2026-06-13T17:32:25.884Z</span>
+    <strong>tool_called</strong>
+<span class="mono">evtx_query</span><span class="muted">{&#34;log&#34;: &#34;artifacts/inode_84706&#34;, &#34;event_ids&#34;: [4624, 4672], &#34;after&#34;: &#34;2020-09-18 03:30:00&#34;, &#34;keyword&#34;: &#34;Administrator&#34;, &#34;limit&#34;: 50}</span>  </div>
+  <div class="ledger-entry" id="ledger-146">
+    <span class="ledger-seq">#146</span>
+    <span class="mono">2026-06-13T17:32:38.498Z</span>
+    <strong>tool_result</strong>
+<span class="mono">evtx_query</span><span class="muted">sha=848799b825d1... · outputs/0145_evtx_query.jsonl · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#147</span>
+    <span class="mono">2026-06-13T17:32:39.245Z</span>
+    <strong>tool_called</strong>
+<span class="mono">evtx_query</span><span class="muted">{&#34;log&#34;: &#34;artifacts/inode_84706&#34;, &#34;event_ids&#34;: [4624], &#34;after&#34;: &#34;2020-09-18 03:30:00&#34;, &#34;keyword&#34;: &#34;10.42.85&#34;, &#34;limit&#34;: 30}</span>  </div>
+  <div class="ledger-entry" id="ledger-148">
+    <span class="ledger-seq">#148</span>
+    <span class="mono">2026-06-13T17:32:53.545Z</span>
+    <strong>tool_result</strong>
+<span class="mono">evtx_query</span><span class="muted">sha=848799b825d1... · outputs/0147_evtx_query.jsonl · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#149</span>
+    <span class="mono">2026-06-13T17:33:15.791Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0861 (cumulative $1.7919)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#150</span>
+    <span class="mono">2026-06-13T17:33:15.804Z</span>
+    <strong>finding_recorded</strong>
+<span class="muted">F-004: DC01 (WIN-E0PO207ERMD.C137.local) shows C137\\Administrator logged in interactively (logon type 7) at 2020-09-18T03:41:5</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#151</span>
+    <span class="mono">2026-06-13T17:33:15.821Z</span>
+    <strong>tool_called</strong>
+<span class="mono">evtx_query</span><span class="muted">{&#34;log&#34;: &#34;artifacts/inode_84706&#34;, &#34;event_ids&#34;: [4624, 4625], &#34;after&#34;: &#34;2020-09-17 22:00:00&#34;, &#34;before&#34;: &#34;2020-09-18 02:00:00&#34;, &#34;keyword&#34;: &#34;LogonType\\\&#34;:\\\&#34;10&#34;, &#34;limit&#34;: 30}</span>  </div>
+  <div class="ledger-entry" id="ledger-152">
+    <span class="ledger-seq">#152</span>
+    <span class="mono">2026-06-13T17:33:27.630Z</span>
+    <strong>tool_result</strong>
+<span class="mono">evtx_query</span><span class="muted">sha=848799b825d1... · outputs/0151_evtx_query.jsonl · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#153</span>
+    <span class="mono">2026-06-13T17:33:43.773Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0624 (cumulative $1.8543)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#154</span>
+    <span class="mono">2026-06-13T17:33:43.786Z</span>
+    <strong>tool_called</strong>
+<span class="mono">evtx_query</span><span class="muted">{&#34;log&#34;: &#34;artifacts/inode_84706&#34;, &#34;event_ids&#34;: [4624, 4625], &#34;after&#34;: &#34;2020-09-17 20:00:00&#34;, &#34;before&#34;: &#34;2020-09-18 03:35:00&#34;, &#34;keyword&#34;: &#34;10.42.85.115&#34;, &#34;limit&#34;: 30}</span>  </div>
+  <div class="ledger-entry" id="ledger-155">
+    <span class="ledger-seq">#155</span>
+    <span class="mono">2026-06-13T17:33:56.611Z</span>
+    <strong>tool_result</strong>
+<span class="mono">evtx_query</span><span class="muted">sha=848799b825d1... · outputs/0154_evtx_query.jsonl · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#156</span>
+    <span class="mono">2026-06-13T17:33:58.558Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mft_query</span><span class="muted">{&#34;mft_path&#34;: &#34;artifacts/inode_0&#34;, &#34;path_contains&#34;: &#34;PowerShell&#34;, &#34;after&#34;: &#34;2020-09-18 03:00:00&#34;, &#34;deleted_only&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-157">
+    <span class="ledger-seq">#157</span>
+    <span class="mono">2026-06-13T17:34:06.089Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mft_query</span><span class="muted">sha=d6029cee8d94... · outputs/0156_mft_query.csv · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#158</span>
+    <span class="mono">2026-06-13T17:34:51.897Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0632 (cumulative $1.9175)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#159</span>
+    <span class="mono">2026-06-13T17:34:51.911Z</span>
+    <strong>tool_called</strong>
+<span class="mono">evtx_query</span><span class="muted">{&#34;log&#34;: &#34;artifacts/inode_84706&#34;, &#34;event_ids&#34;: [4624], &#34;after&#34;: &#34;2020-09-18 03:30:00&#34;, &#34;before&#34;: &#34;2020-09-18 04:00:00&#34;, &#34;keyword&#34;: &#34;SDN1RPT&#34;, &#34;limit&#34;: 30}</span>  </div>
+  <div class="ledger-entry" id="ledger-160">
+    <span class="ledger-seq">#160</span>
+    <span class="mono">2026-06-13T17:35:03.432Z</span>
+    <strong>tool_result</strong>
+<span class="mono">evtx_query</span><span class="muted">sha=848799b825d1... · outputs/0159_evtx_query.jsonl · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#161</span>
+    <span class="mono">2026-06-13T17:35:04.218Z</span>
+    <strong>tool_called</strong>
+<span class="mono">evtx_query</span><span class="muted">{&#34;log&#34;: &#34;artifacts/inode_84706&#34;, &#34;event_ids&#34;: [4624], &#34;after&#34;: &#34;2020-09-18 03:30:00&#34;, &#34;before&#34;: &#34;2020-09-18 04:00:00&#34;, &#34;keyword&#34;: &#34;115&#34;, &#34;limit&#34;: 30}</span>  </div>
+  <div class="ledger-entry" id="ledger-162">
+    <span class="ledger-seq">#162</span>
+    <span class="mono">2026-06-13T17:35:17.410Z</span>
+    <strong>tool_result</strong>
+<span class="mono">evtx_query</span><span class="muted">sha=848799b825d1... · outputs/0161_evtx_query.jsonl · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#163</span>
+    <span class="mono">2026-06-13T17:36:16.677Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.1017 (cumulative $2.0192)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#164</span>
+    <span class="mono">2026-06-13T17:36:16.694Z</span>
+    <strong>tool_called</strong>
+<span class="mono">evtx_query</span><span class="muted">{&#34;log&#34;: &#34;artifacts/inode_84706&#34;, &#34;event_ids&#34;: [4624, 4672, 4625], &#34;after&#34;: &#34;2020-09-19 03:00:00&#34;, &#34;limit&#34;: 30}</span>  </div>
+  <div class="ledger-entry" id="ledger-165">
+    <span class="ledger-seq">#165</span>
+    <span class="mono">2026-06-13T17:36:32.753Z</span>
+    <strong>tool_result</strong>
+<span class="mono">evtx_query</span><span class="muted">sha=848799b825d1... · outputs/0164_evtx_query.jsonl · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#166</span>
+    <span class="mono">2026-06-13T17:37:05.702Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0973 (cumulative $2.1165)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#167</span>
+    <span class="mono">2026-06-13T17:37:05.721Z</span>
+    <strong>tool_called</strong>
+<span class="mono">evtx_query</span><span class="muted">{&#34;log&#34;: &#34;artifacts/inode_84706&#34;, &#34;event_ids&#34;: [4624, 4672, 4625], &#34;after&#34;: &#34;2020-09-19 03:30:00&#34;, &#34;keyword&#34;: &#34;Administrator&#34;, &#34;limit&#34;: 30}</span>  </div>
+  <div class="ledger-entry" id="ledger-168">
+    <span class="ledger-seq">#168</span>
+    <span class="mono">2026-06-13T17:37:19.623Z</span>
+    <strong>tool_result</strong>
+<span class="mono">evtx_query</span><span class="muted">sha=848799b825d1... · outputs/0167_evtx_query.jsonl · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#169</span>
+    <span class="mono">2026-06-13T17:37:20.424Z</span>
+    <strong>tool_called</strong>
+<span class="mono">evtx_query</span><span class="muted">{&#34;log&#34;: &#34;artifacts/inode_84706&#34;, &#34;event_ids&#34;: [4624], &#34;after&#34;: &#34;2020-09-19 03:30:00&#34;, &#34;before&#34;: &#34;2020-09-19 04:00:00&#34;, &#34;limit&#34;: 30}</span>  </div>
+  <div class="ledger-entry" id="ledger-170">
+    <span class="ledger-seq">#170</span>
+    <span class="mono">2026-06-13T17:37:34.426Z</span>
+    <strong>tool_result</strong>
+<span class="mono">evtx_query</span><span class="muted">sha=848799b825d1... · outputs/0169_evtx_query.jsonl · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#171</span>
+    <span class="mono">2026-06-13T17:38:07.178Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.1032 (cumulative $2.2197)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#172</span>
+    <span class="mono">2026-06-13T17:38:07.195Z</span>
+    <strong>finding_recorded</strong>
+<span class="muted">F-005: CITADEL-DC01 security log shows C137\\Administrator made multiple Kerberos Type 3 (network) logons from source IP 10.42.</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#173</span>
+    <span class="mono">2026-06-13T17:38:07.212Z</span>
+    <strong>tool_called</strong>
+<span class="mono">evtx_query</span><span class="muted">{&#34;log&#34;: &#34;artifacts/inode_84706&#34;, &#34;event_ids&#34;: [4624, 4625], &#34;after&#34;: &#34;2020-09-19 01:20:00&#34;, &#34;before&#34;: &#34;2020-09-19 03:36:00&#34;, &#34;keyword&#34;: &#34;10.42.85.115&#34;, &#34;limit&#34;: 30}</span>  </div>
+  <div class="ledger-entry" id="ledger-174">
+    <span class="ledger-seq">#174</span>
+    <span class="mono">2026-06-13T17:38:19.317Z</span>
+    <strong>tool_result</strong>
+<span class="mono">evtx_query</span><span class="muted">sha=848799b825d1... · outputs/0173_evtx_query.jsonl · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#175</span>
+    <span class="mono">2026-06-13T17:39:01.085Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0996 (cumulative $2.3193)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#176</span>
+    <span class="mono">2026-06-13T17:39:01.099Z</span>
+    <strong>tool_called</strong>
+<span class="mono">fs_extract</span><span class="muted">{&#34;image&#34;: &#34;E01-DC01/20200918_0347_CDrive.E01&#34;, &#34;target&#34;: &#34;87072&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-177">
+    <span class="ledger-seq">#177</span>
+    <span class="mono">2026-06-13T17:39:01.304Z</span>
+    <strong>tool_result</strong>
+<span class="mono">fs_extract</span><span class="muted">sha=8e9f763cbe3d... · outputs/0176_fs_extract.bin · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#178</span>
+    <span class="mono">2026-06-13T17:39:02.436Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mft_query</span><span class="muted">{&#34;mft_path&#34;: &#34;artifacts/inode_0&#34;, &#34;path_contains&#34;: &#34;lsass&#34;, &#34;after&#34;: &#34;2020-09-19 01:00:00&#34;, &#34;deleted_only&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-179">
+    <span class="ledger-seq">#179</span>
+    <span class="mono">2026-06-13T17:39:09.859Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mft_query</span><span class="muted">sha=3f3711459c5b... · outputs/0178_mft_query.csv · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#180</span>
+    <span class="mono">2026-06-13T17:39:40.597Z</span>
+    <strong>tool_called</strong>
+<span class="mono">evtx_query</span><span class="muted">{&#34;log&#34;: &#34;artifacts/inode_84706&#34;, &#34;event_ids&#34;: [4688], &#34;after&#34;: &#34;2020-09-19 03:30:00&#34;, &#34;before&#34;: &#34;2020-09-19 04:00:00&#34;, &#34;limit&#34;: 20}</span>  </div>
+  <div class="ledger-entry" id="ledger-181">
+    <span class="ledger-seq">#181</span>
+    <span class="mono">2026-06-13T17:39:53.103Z</span>
+    <strong>tool_result</strong>
+<span class="mono">evtx_query</span><span class="muted">sha=848799b825d1... · outputs/0180_evtx_query.jsonl · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#182</span>
+    <span class="mono">2026-06-13T17:39:58.384Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0645 (cumulative $2.3838)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#183</span>
+    <span class="mono">2026-06-13T17:39:58.399Z</span>
+    <strong>tool_called</strong>
+<span class="mono">read_artifact</span><span class="muted">{&#34;path&#34;: &#34;artifacts/inode_87072&#34;, &#34;offset&#34;: 0, &#34;length&#34;: 4096, &#34;mode&#34;: &#34;text&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-184">
+    <span class="ledger-seq">#184</span>
+    <span class="mono">2026-06-13T17:39:58.403Z</span>
+    <strong>tool_result</strong>
+<span class="mono">read_artifact</span><span class="muted">sha=194c975966d1... · outputs/0183_read_artifact.json · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#185</span>
+    <span class="mono">2026-06-13T17:39:58.416Z</span>
+    <strong>tool_rejected</strong>
+<span class="mono">execution_evidence</span><span class="muted">source directory &#39;/cases/szechuan/Protected Files&#39; contains no .pf files</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#186</span>
+    <span class="mono">2026-06-13T17:39:58.428Z</span>
+    <strong>tool_rejected</strong>
+<span class="mono">execution_evidence</span><span class="muted">source directory &#39;/cases/szechuan/Protected Files&#39; contains no .pf files</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#187</span>
+    <span class="mono">2026-06-13T17:40:33.433Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.1168 (cumulative $2.5006)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#188</span>
+    <span class="mono">2026-06-13T17:40:33.451Z</span>
+    <strong>finding_recorded</strong>
+<span class="muted">F-006: CITADEL-DC01&#39;s spoolsv.exe crashed with exception code c0000005 (ACCESS_VIOLATION, fault module StackHash_1e37) at 2020-</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#189</span>
+    <span class="mono">2026-06-13T17:40:33.469Z</span>
+    <strong>tool_called</strong>
+<span class="mono">evtx_query</span><span class="muted">{&#34;log&#34;: &#34;artifacts/inode_84706&#34;, &#34;event_ids&#34;: [4624, 4625], &#34;after&#34;: &#34;2020-09-18 22:00:00&#34;, &#34;before&#34;: &#34;2020-09-19 01:30:00&#34;, &#34;keyword&#34;: &#34;LogonType\\\&#34;:\\\&#34;10&#34;, &#34;limit&#34;: 20}</span>  </div>
+  <div class="ledger-entry" id="ledger-190">
+    <span class="ledger-seq">#190</span>
+    <span class="mono">2026-06-13T17:40:44.945Z</span>
+    <strong>tool_result</strong>
+<span class="mono">evtx_query</span><span class="muted">sha=848799b825d1... · outputs/0189_evtx_query.jsonl · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#191</span>
+    <span class="mono">2026-06-13T17:40:54.174Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0705 (cumulative $2.5712)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#192</span>
+    <span class="mono">2026-06-13T17:40:54.188Z</span>
+    <strong>tool_called</strong>
+<span class="mono">read_artifact</span><span class="muted">{&#34;path&#34;: &#34;DC01-autorunsc.zip&#34;, &#34;offset&#34;: 0, &#34;length&#34;: 100, &#34;mode&#34;: &#34;hex&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-193">
+    <span class="ledger-seq">#193</span>
+    <span class="mono">2026-06-13T17:40:54.218Z</span>
+    <strong>tool_result</strong>
+<span class="mono">read_artifact</span><span class="muted">sha=14bc61b3ded6... · outputs/0192_read_artifact.json · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#194</span>
+    <span class="mono">2026-06-13T17:40:54.232Z</span>
+    <strong>tool_called</strong>
+<span class="mono">evtx_query</span><span class="muted">{&#34;log&#34;: &#34;artifacts/inode_84706&#34;, &#34;event_ids&#34;: [4624], &#34;after&#34;: &#34;2020-09-18 22:00:00&#34;, &#34;before&#34;: &#34;2020-09-19 01:30:00&#34;, &#34;keyword&#34;: &#34;WIN-E0PO207ERMD&#34;, &#34;limit&#34;: 20}</span>  </div>
+  <div class="ledger-entry" id="ledger-195">
+    <span class="ledger-seq">#195</span>
+    <span class="mono">2026-06-13T17:41:06.826Z</span>
+    <strong>tool_result</strong>
+<span class="mono">evtx_query</span><span class="muted">sha=848799b825d1... · outputs/0194_evtx_query.jsonl · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#196</span>
+    <span class="mono">2026-06-13T17:41:22.430Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0817 (cumulative $2.6528)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#197</span>
+    <span class="mono">2026-06-13T17:41:22.443Z</span>
+    <strong>tool_called</strong>
+<span class="mono">read_artifact</span><span class="muted">{&#34;path&#34;: &#34;DC01-autorunsc.zip&#34;, &#34;offset&#34;: 100, &#34;length&#34;: 8192, &#34;mode&#34;: &#34;text&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-198">
+    <span class="ledger-seq">#198</span>
+    <span class="mono">2026-06-13T17:41:22.446Z</span>
+    <strong>tool_result</strong>
+<span class="mono">read_artifact</span><span class="muted">sha=04b3511b904a... · outputs/0197_read_artifact.json · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#199</span>
+    <span class="mono">2026-06-13T17:41:31.343Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.1008 (cumulative $2.7536)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#200</span>
+    <span class="mono">2026-06-13T17:41:31.364Z</span>
+    <strong>tool_called</strong>
+<span class="mono">read_artifact</span><span class="muted">{&#34;path&#34;: &#34;autorunsc-citadel-dc01.csv&#34;, &#34;offset&#34;: 0, &#34;length&#34;: 8192, &#34;mode&#34;: &#34;text&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-201">
+    <span class="ledger-seq">#201</span>
+    <span class="mono">2026-06-13T17:41:31.367Z</span>
+    <strong>tool_result</strong>
+<span class="mono">read_artifact</span><span class="muted">sha=f883bcd9fb73... · outputs/0200_read_artifact.json · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#202</span>
+    <span class="mono">2026-06-13T17:41:31.386Z</span>
+    <strong>tool_rejected</strong>
+<span class="mono">read_artifact</span><span class="muted">path=&#39;/cases/szechuan/autorunsc-desktop-sdn1rpt.csv&#39; is not an existing file</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#203</span>
+    <span class="mono">2026-06-13T17:41:31.400Z</span>
+    <strong>tool_rejected</strong>
+<span class="mono">read_artifact</span><span class="muted">path=&#39;/cases/szechuan/autorunsc-desktop-sdn1rpt.csv&#39; is not an existing file</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#204</span>
+    <span class="mono">2026-06-13T17:41:52.666Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.1506 (cumulative $2.9043)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#205</span>
+    <span class="mono">2026-06-13T17:41:52.681Z</span>
+    <strong>tool_called</strong>
+<span class="mono">read_artifact</span><span class="muted">{&#34;path&#34;: &#34;autorunsc-citadel-dc01.csv&#34;, &#34;offset&#34;: 900000, &#34;length&#34;: 8192, &#34;mode&#34;: &#34;text&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-206">
+    <span class="ledger-seq">#206</span>
+    <span class="mono">2026-06-13T17:41:52.686Z</span>
+    <strong>tool_result</strong>
+<span class="mono">read_artifact</span><span class="muted">sha=b04cc8106b8a... · outputs/0205_read_artifact.json · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#207</span>
+    <span class="mono">2026-06-13T17:41:52.706Z</span>
+    <strong>tool_rejected</strong>
+<span class="mono">read_artifact</span><span class="muted">path=&#39;/cases/szechuan/autorunsc-DESKTOP-SDN1RPT.csv&#39; is not an existing file</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#208</span>
+    <span class="mono">2026-06-13T17:41:52.716Z</span>
+    <strong>tool_rejected</strong>
+<span class="mono">read_artifact</span><span class="muted">path=&#39;/cases/szechuan/autorunsc-DESKTOP-SDN1RPT.csv&#39; is not an existing file</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#209</span>
+    <span class="mono">2026-06-13T17:42:09.924Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.1492 (cumulative $3.0534)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#210</span>
+    <span class="mono">2026-06-13T17:42:09.944Z</span>
+    <strong>tool_called</strong>
+<span class="mono">read_artifact</span><span class="muted">{&#34;path&#34;: &#34;autorunsc-citadel-dc01.csv&#34;, &#34;offset&#34;: 450000, &#34;length&#34;: 8192, &#34;mode&#34;: &#34;text&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-211">
+    <span class="ledger-seq">#211</span>
+    <span class="mono">2026-06-13T17:42:09.948Z</span>
+    <strong>tool_result</strong>
+<span class="mono">read_artifact</span><span class="muted">sha=be3c096d935a... · outputs/0210_read_artifact.json · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#212</span>
+    <span class="mono">2026-06-13T17:42:09.965Z</span>
+    <strong>budget_event</strong>
+<span class="muted">{&#34;kind&#34;: &#34;triage_soft_cap&#34;, &#34;spent_usd&#34;: 3.05344, &#34;budget_usd&#34;: 5.0, &#34;triage_cap_usd&#34;: 3.0}</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#213</span>
+    <span class="mono">2026-06-13T17:42:15.243Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0222 (cumulative $3.0757)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#214</span>
+    <span class="mono">2026-06-13T17:42:15.255Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mem_analyze</span><span class="muted">{&#34;image&#34;: &#34;DESKTOP-SDN1RPT.mem&#34;, &#34;plugin&#34;: &#34;pstree&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-215">
+    <span class="ledger-seq">#215</span>
+    <span class="mono">2026-06-13T17:42:18.033Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mem_analyze</span><span class="muted">sha=994c6ae154a2... · outputs/0214_mem_analyze.txt · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#216</span>
+    <span class="mono">2026-06-13T17:42:18.046Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mem_analyze</span><span class="muted">{&#34;image&#34;: &#34;DESKTOP-SDN1RPT.mem&#34;, &#34;plugin&#34;: &#34;psscan&#34;, &#34;filter&#34;: &#34;coreupdater&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-217">
+    <span class="ledger-seq">#217</span>
+    <span class="mono">2026-06-13T17:43:36.292Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mem_analyze</span><span class="muted">sha=3f1026c88e5e... · outputs/0216_mem_analyze.txt · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#218</span>
+    <span class="mono">2026-06-13T17:43:48.456Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0343 (cumulative $3.1100)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#219</span>
+    <span class="mono">2026-06-13T17:43:48.472Z</span>
+    <strong>tool_called</strong>
+<span class="mono">read_artifact</span><span class="muted">{&#34;path&#34;: &#34;outputs/0214_mem_analyze.txt&#34;, &#34;offset&#34;: 0, &#34;length&#34;: 8192, &#34;mode&#34;: &#34;text&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-220">
+    <span class="ledger-seq">#220</span>
+    <span class="mono">2026-06-13T17:43:48.475Z</span>
+    <strong>tool_result</strong>
+<span class="mono">read_artifact</span><span class="muted">sha=f44abdfc5f18... · outputs/0219_read_artifact.json · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#221</span>
+    <span class="mono">2026-06-13T17:43:52.813Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0268 (cumulative $3.1368)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#222</span>
+    <span class="mono">2026-06-13T17:43:52.834Z</span>
+    <strong>tool_called</strong>
+<span class="mono">read_artifact</span><span class="muted">{&#34;path&#34;: &#34;outputs/0214_mem_analyze.txt&#34;, &#34;offset&#34;: 8192, &#34;length&#34;: 8192, &#34;mode&#34;: &#34;text&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-223">
+    <span class="ledger-seq">#223</span>
+    <span class="mono">2026-06-13T17:43:52.836Z</span>
+    <strong>tool_result</strong>
+<span class="mono">read_artifact</span><span class="muted">sha=67d553ecb861... · outputs/0222_read_artifact.json · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#224</span>
+    <span class="mono">2026-06-13T17:43:55.419Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0262 (cumulative $3.1630)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#225</span>
+    <span class="mono">2026-06-13T17:43:55.430Z</span>
+    <strong>tool_called</strong>
+<span class="mono">read_artifact</span><span class="muted">{&#34;path&#34;: &#34;outputs/0214_mem_analyze.txt&#34;, &#34;offset&#34;: 16384, &#34;length&#34;: 2000, &#34;mode&#34;: &#34;text&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-226">
+    <span class="ledger-seq">#226</span>
+    <span class="mono">2026-06-13T17:43:55.436Z</span>
+    <strong>tool_result</strong>
+<span class="mono">read_artifact</span><span class="muted">sha=33216643eaf8... · outputs/0225_read_artifact.json · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#227</span>
+    <span class="mono">2026-06-13T17:44:13.663Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0267 (cumulative $3.1898)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#228</span>
+    <span class="mono">2026-06-13T17:44:13.689Z</span>
+    <strong>verdict_recorded</strong>
+<span class="muted">F-001 -&gt; REFUTED: coreupdater.exe (PID 8324) appears in the pstree output as an orphaned top-level entry, directly contradicting the DKOM </span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#229</span>
+    <span class="mono">2026-06-13T17:44:19.364Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0153 (cumulative $3.2051)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#230</span>
+    <span class="mono">2026-06-13T17:44:22.469Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0074 (cumulative $3.2125)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#231</span>
+    <span class="mono">2026-06-13T17:44:22.507Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mem_analyze</span><span class="muted">{&#34;image&#34;: &#34;DESKTOP-SDN1RPT.mem&#34;, &#34;plugin&#34;: &#34;cmdline&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-232">
+    <span class="ledger-seq">#232</span>
+    <span class="mono">2026-06-13T17:44:25.035Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mem_analyze</span><span class="muted">sha=21bf7fbeade5... · outputs/0231_mem_analyze.txt · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#233</span>
+    <span class="mono">2026-06-13T17:44:25.047Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mem_analyze</span><span class="muted">{&#34;image&#34;: &#34;DESKTOP-SDN1RPT.mem&#34;, &#34;plugin&#34;: &#34;psscan&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-234">
+    <span class="ledger-seq">#234</span>
+    <span class="mono">2026-06-13T17:45:50.503Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mem_analyze</span><span class="muted">sha=3f1026c88e5e... · outputs/0233_mem_analyze.txt · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#235</span>
+    <span class="mono">2026-06-13T17:46:00.752Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0457 (cumulative $3.2582)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#236</span>
+    <span class="mono">2026-06-13T17:46:00.769Z</span>
+    <strong>tool_called</strong>
+<span class="mono">read_artifact</span><span class="muted">{&#34;path&#34;: &#34;outputs/0233_mem_analyze.txt&#34;, &#34;offset&#34;: 6000, &#34;length&#34;: 8192, &#34;mode&#34;: &#34;text&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-237">
+    <span class="ledger-seq">#237</span>
+    <span class="mono">2026-06-13T17:46:00.772Z</span>
+    <strong>tool_result</strong>
+<span class="mono">read_artifact</span><span class="muted">sha=4ae4a47fe380... · outputs/0236_read_artifact.json · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#238</span>
+    <span class="mono">2026-06-13T17:46:00.789Z</span>
+    <strong>tool_called</strong>
+<span class="mono">read_artifact</span><span class="muted">{&#34;path&#34;: &#34;outputs/0233_mem_analyze.txt&#34;, &#34;offset&#34;: 14000, &#34;length&#34;: 8192, &#34;mode&#34;: &#34;text&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-239">
+    <span class="ledger-seq">#239</span>
+    <span class="mono">2026-06-13T17:46:00.791Z</span>
+    <strong>tool_result</strong>
+<span class="mono">read_artifact</span><span class="muted">sha=20945f43bde2... · outputs/0238_read_artifact.json · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#240</span>
+    <span class="mono">2026-06-13T17:46:29.425Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0594 (cumulative $3.3176)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#241</span>
+    <span class="mono">2026-06-13T17:46:29.444Z</span>
+    <strong>verdict_recorded</strong>
+<span class="muted">F-002 -&gt; VERIFIED: psscan independently confirms PID 3316 (powershell.exe, PPID 508) created at 05:08:43 UTC, PID 508 (powershell.exe, PPID</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#242</span>
+    <span class="mono">2026-06-13T17:46:32.828Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0162 (cumulative $3.3338)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#243</span>
+    <span class="mono">2026-06-13T17:46:36.477Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0085 (cumulative $3.3423)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#244</span>
+    <span class="mono">2026-06-13T17:46:36.497Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mem_analyze</span><span class="muted">{&#34;image&#34;: &#34;DESKTOP-SDN1RPT.mem&#34;, &#34;plugin&#34;: &#34;netscan&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-245">
+    <span class="ledger-seq">#245</span>
+    <span class="mono">2026-06-13T17:48:50.929Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mem_analyze</span><span class="muted">sha=cbe39c195337... · outputs/0244_mem_analyze.txt · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#246</span>
+    <span class="mono">2026-06-13T17:48:50.950Z</span>
+    <strong>tool_called</strong>
+<span class="mono">fs_list</span><span class="muted">{&#34;image&#34;: &#34;E01-DC01/20200918_0347_CDrive.E01&#34;, &#34;path&#34;: &#34;/&#34;, &#34;recursive&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-247">
+    <span class="ledger-seq">#247</span>
+    <span class="mono">2026-06-13T17:48:52.364Z</span>
+    <strong>tool_result</strong>
+<span class="mono">fs_list</span><span class="muted">sha=6c781f6041be... · outputs/0246_fs_list.txt · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#248</span>
+    <span class="mono">2026-06-13T17:48:52.393Z</span>
+    <strong>tool_called</strong>
+<span class="mono">fs_list</span><span class="muted">{&#34;image&#34;: &#34;E01-DC01/20200918_0347_CDrive.E01&#34;, &#34;path&#34;: &#34;/FileShare&#34;, &#34;recursive&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-249">
+    <span class="ledger-seq">#249</span>
+    <span class="mono">2026-06-13T17:48:54.216Z</span>
+    <strong>tool_result</strong>
+<span class="mono">fs_list</span><span class="muted">sha=6c781f6041be... · outputs/0248_fs_list.txt · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#250</span>
+    <span class="mono">2026-06-13T17:49:10.958Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.1002 (cumulative $3.4425)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#251</span>
+    <span class="mono">2026-06-13T17:49:10.975Z</span>
+    <strong>verdict_recorded</strong>
+<span class="muted">F-003 -&gt; VERIFIED: All three cited queries reproduced with matching SHA-256s: netscan confirms ESTABLISHED TCPv4 10.42.85.115:50957→10.42.8</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#252</span>
+    <span class="mono">2026-06-13T17:49:14.950Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0152 (cumulative $3.4577)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#253</span>
+    <span class="mono">2026-06-13T17:49:19.525Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0096 (cumulative $3.4673)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#254</span>
+    <span class="mono">2026-06-13T17:49:19.547Z</span>
+    <strong>tool_called</strong>
+<span class="mono">evtx_query</span><span class="muted">{&#34;log&#34;: &#34;artifacts/inode_84706&#34;, &#34;event_ids&#34;: [4624, 4672], &#34;after&#34;: &#34;2020-09-18 03:30:00&#34;, &#34;keyword&#34;: &#34;Administrator&#34;, &#34;limit&#34;: 50}</span>  </div>
+  <div class="ledger-entry" id="ledger-255">
+    <span class="ledger-seq">#255</span>
+    <span class="mono">2026-06-13T17:49:35.377Z</span>
+    <strong>tool_result</strong>
+<span class="mono">evtx_query</span><span class="muted">sha=848799b825d1... · outputs/0254_evtx_query.jsonl · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#256</span>
+    <span class="mono">2026-06-13T17:49:36.213Z</span>
+    <strong>tool_called</strong>
+<span class="mono">fs_list</span><span class="muted">{&#34;image&#34;: &#34;E01-DC01/20200918_0347_CDrive.E01&#34;, &#34;path&#34;: &#34;/&#34;, &#34;recursive&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-257">
+    <span class="ledger-seq">#257</span>
+    <span class="mono">2026-06-13T17:49:37.276Z</span>
+    <strong>tool_result</strong>
+<span class="mono">fs_list</span><span class="muted">sha=6c781f6041be... · outputs/0256_fs_list.txt · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#258</span>
+    <span class="mono">2026-06-13T17:49:37.294Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mem_analyze</span><span class="muted">{&#34;image&#34;: &#34;DESKTOP-SDN1RPT.mem&#34;, &#34;plugin&#34;: &#34;psscan&#34;, &#34;filter&#34;: &#34;coreupdater&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-259">
+    <span class="ledger-seq">#259</span>
+    <span class="mono">2026-06-13T17:51:26.324Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mem_analyze</span><span class="muted">sha=3f1026c88e5e... · outputs/0258_mem_analyze.txt · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#260</span>
+    <span class="mono">2026-06-13T17:51:49.575Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0693 (cumulative $3.5366)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#261</span>
+    <span class="mono">2026-06-13T17:51:49.589Z</span>
+    <strong>verdict_recorded</strong>
+<span class="muted">F-004 -&gt; REFUTED: The DC Administrator logon is 2020-09-18T03:41:57 UTC, but coreupdater.exe ran 2020-09-19T03:40:49–03:43:10 UTC and File</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#262</span>
+    <span class="mono">2026-06-13T17:51:53.625Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0141 (cumulative $3.5508)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#263</span>
+    <span class="mono">2026-06-13T17:52:01.552Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0097 (cumulative $3.5604)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#264</span>
+    <span class="mono">2026-06-13T17:52:01.566Z</span>
+    <strong>tool_called</strong>
+<span class="mono">evtx_query</span><span class="muted">{&#34;log&#34;: &#34;artifacts/inode_84706&#34;, &#34;event_ids&#34;: [4624, 4672, 4625], &#34;after&#34;: &#34;2020-09-19 03:30:00&#34;, &#34;keyword&#34;: &#34;Administrator&#34;, &#34;limit&#34;: 30}</span>  </div>
+  <div class="ledger-entry" id="ledger-265">
+    <span class="ledger-seq">#265</span>
+    <span class="mono">2026-06-13T17:52:16.065Z</span>
+    <strong>tool_result</strong>
+<span class="mono">evtx_query</span><span class="muted">sha=848799b825d1... · outputs/0264_evtx_query.jsonl · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#266</span>
+    <span class="mono">2026-06-13T17:52:16.783Z</span>
+    <strong>tool_called</strong>
+<span class="mono">fs_list</span><span class="muted">{&#34;image&#34;: &#34;E01-DC01/20200918_0347_CDrive.E01&#34;, &#34;path&#34;: &#34;/&#34;, &#34;recursive&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-267">
+    <span class="ledger-seq">#267</span>
+    <span class="mono">2026-06-13T17:52:17.730Z</span>
+    <strong>tool_result</strong>
+<span class="mono">fs_list</span><span class="muted">sha=6c781f6041be... · outputs/0266_fs_list.txt · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#268</span>
+    <span class="mono">2026-06-13T17:52:17.747Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mem_analyze</span><span class="muted">{&#34;image&#34;: &#34;DESKTOP-SDN1RPT.mem&#34;, &#34;plugin&#34;: &#34;psscan&#34;, &#34;filter&#34;: &#34;coreupdater&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-269">
+    <span class="ledger-seq">#269</span>
+    <span class="mono">2026-06-13T17:53:38.900Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mem_analyze</span><span class="muted">sha=3f1026c88e5e... · outputs/0268_mem_analyze.txt · truncated · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#270</span>
+    <span class="mono">2026-06-13T17:54:01.448Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0675 (cumulative $3.6279)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#271</span>
+    <span class="mono">2026-06-13T17:54:01.464Z</span>
+    <strong>verdict_recorded</strong>
+<span class="muted">F-005 -&gt; VERIFIED: All three cited queries reproduced with exact SHA matches: Security log confirms multiple Kerberos LogonType=3 events fo</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#272</span>
+    <span class="mono">2026-06-13T17:54:06.278Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0142 (cumulative $3.6420)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#273</span>
+    <span class="mono">2026-06-13T17:54:11.078Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0079 (cumulative $3.6499)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#274</span>
+    <span class="mono">2026-06-13T17:54:12.456Z</span>
+    <strong>tool_called</strong>
+<span class="mono">mft_query</span><span class="muted">{&#34;mft_path&#34;: &#34;artifacts/inode_0&#34;, &#34;path_contains&#34;: &#34;ProgramData&#34;, &#34;after&#34;: &#34;2020-09-18 00:00:00&#34;, &#34;deleted_only&#34;: false}</span>  </div>
+  <div class="ledger-entry" id="ledger-275">
+    <span class="ledger-seq">#275</span>
+    <span class="mono">2026-06-13T17:54:19.899Z</span>
+    <strong>tool_result</strong>
+<span class="mono">mft_query</span><span class="muted">sha=da93ecabd54a... · outputs/0274_mft_query.csv · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#276</span>
+    <span class="mono">2026-06-13T17:54:55.584Z</span>
+    <strong>tool_called</strong>
+<span class="mono">read_artifact</span><span class="muted">{&#34;path&#34;: &#34;artifacts/inode_87072&#34;, &#34;offset&#34;: 0, &#34;length&#34;: 4096, &#34;mode&#34;: &#34;text&#34;}</span>  </div>
+  <div class="ledger-entry" id="ledger-277">
+    <span class="ledger-seq">#277</span>
+    <span class="mono">2026-06-13T17:54:55.587Z</span>
+    <strong>tool_result</strong>
+<span class="mono">read_artifact</span><span class="muted">sha=194c975966d1... · outputs/0276_read_artifact.json · exit=0</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#278</span>
+    <span class="mono">2026-06-13T17:55:12.898Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0697 (cumulative $3.7197)</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#279</span>
+    <span class="mono">2026-06-13T17:55:12.922Z</span>
+    <strong>verdict_recorded</strong>
+<span class="muted">F-006 -&gt; VERIFIED: WER report inode_87072 (SHA matched exactly) contains EventType=APPCRASH, NsAppName=spoolsv.exe, Fault Module=StackHash_</span>  </div>
+  <div class="ledger-entry">
+    <span class="ledger-seq">#280</span>
+    <span class="mono">2026-06-13T17:55:18.002Z</span>
+    <strong>api_usage</strong>
+<span class="muted">cost $0.0140 (cumulative $3.7337)</span>  </div>
+</section>
+
+<section>
+  <h2>Appendix D &mdash; Methodology &amp; constraints</h2>
+  <p>This investigation was produced by VERDICT, an autonomous agent whose safety is
+    enforced by architecture, not by prompts. The agent's only actuators are a fixed
+    set of typed, read-only forensic tools placed in its tool list for the current
+    phase. Specifically, by construction:</p>
+  <ul>
+    <li><strong>No shell, no file-write tool.</strong> There is no tool that accepts an arbitrary
+      command string and no tool that writes to evidence &mdash; the harmful capability does not
+      exist in the agent's tool list, so it cannot be enabled by a prompt.</li>
+    <li><strong>Typed, validated parameters.</strong> Every tool call is validated server-side;
+      malformed calls are rejected and recorded in the ledger.</li>
+    <li><strong>Server-side path guard.</strong> Tools may read only from the evidence folder and
+      write only to this run's output folder; any path outside either is refused by the server.</li>
+    <li><strong>Single-writer ledger.</strong> The audit ledger is written exclusively by the
+      server, one fsync'd line per event; the agent has no tool that can write or modify it.</li>
+    <li><strong>Independent verification.</strong> Every reported finding was re-derived by a
+      separate adversarial pass in a fresh context with a restricted toolset, working only from
+      the raw evidence the finding cited. Refuted claims (Appendix A) are kept out of the headline.</li>
+  </ul>
+  <p class="muted">Pcap files, if present, are inventoried and hashed but not parsed (deep packet
+    analysis is out of scope for this run).</p>
+</section>
+
+<footer>
+  Generated by VERDICT &mdash; run <span class="mono">20260613T165313Z</span> &middot;
+  model <span class="mono">claude-sonnet-4-6</span> &middot; total cost $3.7337.
+  Self-contained HTML: open offline, no server required.
+</footer>
+
+</body>
+</html>

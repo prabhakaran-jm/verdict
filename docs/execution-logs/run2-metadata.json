@@ -1,0 +1,10 @@
+{
+  "run_id": "20260613T165313Z",
+  "command": "verdict investigate /cases/szechuan/",
+  "wall_min": 62,
+  "cost_usd": 3.73,
+  "findings": 6,
+  "verified": 4,
+  "refuted": 2,
+  "transcript": "terminal scrollback not saved; use ledger-run2-*.jsonl"
+}
