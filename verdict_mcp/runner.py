@@ -121,7 +121,8 @@ class Runner:
     def run_tool(self, capability: str, args: Sequence[str | Path], *,
                  tool: str | None = None, params: dict[str, Any] | None = None,
                  ext: str = "txt", timeout_s: int | None = None,
-                 component: str | None = None) -> RunResult:
+                 component: str | None = None,
+                 output_file: Path | None = None) -> RunResult:
         """Run one fixed binary with validated args; persist + ledger everything.
 
         capability: binaries.py capability name (or an extra_argv test entry).
@@ -136,6 +137,12 @@ class Runner:
         timeout_s:  override; defaults to DEFAULT_TIMEOUTS[tool] or 120 s.
         component:  pick a non-lead component of the capability, e.g.
                     run_tool("fs", ..., component="icat").
+        output_file: a tool that writes its real output to a FILE rather than
+                    stdout (e.g. EvtxECmd -> records JSONL) passes that path;
+                    the runner hashes/persists those DETERMINISTIC bytes as the
+                    cited artifact instead of the run-stamped console log on
+                    stdout, so static evidence re-runs byte-for-byte (no replay
+                    drift). Falls back to stdout if the file is missing.
         """
         tool = tool or capability
         prefix = self._argv_prefix(capability, component)
@@ -174,9 +181,17 @@ class Runner:
         duration_ms = int((time.monotonic() - start) * 1000)
 
         # Full output + hash exist even for failures - citations stay checkable.
-        out_path.write_bytes(stdout)
-        output_sha256 = hashlib.sha256(stdout).hexdigest()
-        excerpt, truncated = _excerpt(stdout)
+        # When the tool wrote its records to output_file, cite THOSE bytes (the
+        # actual evidence, deterministic) not stdout (EvtxECmd's console log is
+        # run-stamped and would drift on every re-run). stdout otherwise - which
+        # is the records themselves for stdout-emitting tools like evtx_dump.
+        if output_file is not None and output_file.is_file():
+            payload = output_file.read_bytes()
+        else:
+            payload = stdout
+        out_path.write_bytes(payload)
+        output_sha256 = hashlib.sha256(payload).hexdigest()
+        excerpt, truncated = _excerpt(payload)
         stderr_excerpt, _ = _excerpt(stderr, STDERR_EXCERPT_CAP_BYTES)
 
         is_error = timed_out or error is not None or exit_code != 0

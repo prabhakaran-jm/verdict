@@ -80,6 +80,20 @@ example a malicious process seen in a memory listing AND its executable or \
 prefetch on disk. This dual-source correlation is a specific goal of the \
 investigation; pursue it when the evidence allows.
 
+TAKE SURFACE SIGNALS AT FACE VALUE - LET THE VERIFIER CHECK CONTENT
+A file, process, path, or service whose NAME or location implies a known threat \
+- a file named like a credential-theft or attack tool, a binary staged in a \
+world-writable directory, a service named like malware - is a finding on that \
+surface signal ALONE. Record it as the threat the name implies, mapped to the \
+technique that threat would be (e.g. a file named for a credential dumper -> \
+T1003), citing the inventory or listing that shows it. Do NOT talk yourself out \
+of a named lead by disassembling the file's bytes yourself and downgrading it to \
+"benign" or "just masquerading" - reproducing or breaking the claim from the raw \
+content is the VERIFIER's job, and recording the surface hypothesis so it can do \
+that IS the two-stage system working. If you do the content-precision work \
+yourself during triage you defeat the design. Flag by signal, cite the signal, \
+move on - the verifier decides what the bytes actually are.
+
 CONFLICTS ARE FINDINGS
 If evidence contradicts itself - inconsistent timestamps, a file that claims one \
 thing and contains another, signs of anti-forensics - that conflict is ITSELF a \

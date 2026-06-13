@@ -163,8 +163,14 @@ def register(app: "FastMCP", ctx: "AppContext") -> None:
         else:  # evtx_dump (or the test stub): JSONL on stdout
             args = ["-o", "jsonl", path]
 
+        # EvtxECmd writes records to records_file (a scratch JSONL); hand that
+        # to the runner so the cited artifact is the DETERMINISTIC records, not
+        # EvtxECmd's run-stamped console log (which drifts on every re-run).
+        # evtx_dump emits records on stdout -> records_file is None -> stdout is
+        # already the deterministic artifact.
         run = ctx.runner.run_tool("evtx", args, tool="evtx_query",
-                                  params=params, ext="jsonl")
+                                  params=params, ext="jsonl",
+                                  output_file=records_file)
         if run.is_error:
             return run.payload()
         source = records_file if records_file is not None else run.output_path
