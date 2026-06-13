@@ -1,3 +1,6 @@
+# Local-only AI handover doc - never commit
+AI_HANDOVER.md
+
 # Run outputs - keep the directory, ignore every run
 runs/*
 !runs/.gitkeep
