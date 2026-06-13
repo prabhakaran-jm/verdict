@@ -31,6 +31,7 @@ Prints PASS/FAIL per check; exits nonzero on any FAIL.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import sys
@@ -214,10 +215,10 @@ def check_mixed_run() -> None:
 
     with tempfile.TemporaryDirectory() as td:
         run_dir = _write_run(Path(td))
-        path = generate_report(
+        path = asyncio.run(generate_report(
             str(run_dir), _FINDINGS_MIXED, str(run_dir / "ledger.jsonl"),
             case_name="smoke", model="claude-sonnet-4-6", total_cost=0.34,
-            wall_time="2m 13s", anthropic_client=FakeAnthropic(prose))
+            wall_time="2m 13s", anthropic_client=FakeAnthropic(prose)))
         html = Path(path).read_text(encoding="utf-8")
 
     # self-contained: inline style, no external script/link
@@ -283,10 +284,10 @@ def check_clean_case() -> None:
     with tempfile.TemporaryDirectory() as td:
         run_dir = _write_run(Path(td))
         # zero findings; no prose client -> deterministic honest-empty summary.
-        path = generate_report(
+        path = asyncio.run(generate_report(
             str(run_dir), [], str(run_dir / "ledger.jsonl"),
             case_name="clean", model="claude-sonnet-4-6", total_cost=0.10,
-            anthropic_client=None)
+            anthropic_client=None))
         html = Path(path).read_text(encoding="utf-8")
 
     assert "<html" in html and "</html>" in html, "not valid-ish HTML"
@@ -341,12 +342,12 @@ def check_budget_note() -> None:
                 "kind": "triage_cap", "spent_usd": 3.01,
                 "budget_usd": 5.0}) + "\n")
         # explicit caller note too (BudgetGuard.notes path).
-        path = generate_report(
+        path = asyncio.run(generate_report(
             str(run_dir), _FINDINGS_MIXED, str(run_dir / "ledger.jsonl"),
             case_name="smoke", model="claude-sonnet-4-6", total_cost=3.10,
             anthropic_client=None,
             budget_notes=["Triage reached its soft budget cap; "
-                          "transitioned to verification."])
+                          "transitioned to verification."]))
         html = Path(path).read_text(encoding="utf-8")
 
     assert "Budget guard:" in html, "budget note not surfaced"
