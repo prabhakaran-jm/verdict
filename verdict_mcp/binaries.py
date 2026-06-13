@@ -169,6 +169,7 @@ def _pymodule(module: str, probe_args: tuple[str, ...] = (), expect: str = "",
 
 _FLS = _exe("fls", ("fls",), ("-V",), expect="sleuth kit")
 _ICAT = _exe("icat", ("icat",), ("-V",), expect="sleuth kit")
+_IFIND = _exe("ifind", ("ifind",), ("-V",), expect="sleuth kit")
 _MACTIME = _exe("mactime", ("mactime",), ("-V",), expect="sleuth kit")
 _RIP = _exe("rip.pl", ("rip.pl", "rip", "regripper"), (), expect="rip")
 
@@ -180,7 +181,7 @@ CAPABILITIES: tuple[Capability, ...] = (
             name="primary",
             description="Sleuth Kit (fls, icat, mactime)",
             groups=(Group("fls", (_FLS,)), Group("icat", (_ICAT,)),
-                    Group("mactime", (_MACTIME,))),
+                    Group("ifind", (_IFIND,)), Group("mactime", (_MACTIME,))),
             lead="fls",
         ),
         fallback=None,

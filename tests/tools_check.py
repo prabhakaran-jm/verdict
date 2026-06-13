@@ -533,12 +533,15 @@ def check_phase_allowlists() -> None:
 
     tools = asyncio.run(ENV.app.list_tools())
     names = {t.name for t in tools}
-    item4 = {"evidence_inventory", "evtx_query", "registry_query",
-             "execution_evidence", "yara_scan", "read_artifact",
-             "record_finding", "record_verdict"}
-    assert item4 <= names, f"missing tools: {item4 - names}"
-    assert names - item4 == {"_log_event"}, (
-        f"unexpected extra tools: {names - item4 - {'_log_event'}}")
+    model_tools = {
+        "evidence_inventory", "fs_list", "fs_extract", "mft_query",
+        "evtx_query", "registry_query", "execution_evidence",
+        "timeline_query", "mem_analyze", "yara_scan", "read_artifact",
+        "record_finding", "record_verdict",
+    }
+    assert model_tools <= names, f"missing tools: {model_tools - names}"
+    assert names - model_tools == {"_log_event"}, (
+        f"unexpected extra tools: {names - model_tools - {'_log_event'}}")
 
     schemas = {t.name: t.inputSchema for t in tools}
     assert "limit" in schemas["evtx_query"]["required"]

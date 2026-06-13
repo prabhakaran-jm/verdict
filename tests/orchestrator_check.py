@@ -174,12 +174,11 @@ def check_mcp_client_end_to_end() -> None:
                 assert "_log_event" not in all_names, \
                     "control-plane tool leaked into the model's tool list"
                 assert all_names == {
-                    "evidence_inventory", "evtx_query", "registry_query",
-                    "execution_evidence", "yara_scan", "read_artifact",
-                    "record_finding", "record_verdict",
+                    "evidence_inventory", "fs_list", "fs_extract", "mft_query",
+                    "evtx_query", "registry_query", "execution_evidence",
+                    "timeline_query", "mem_analyze", "yara_scan",
+                    "read_artifact", "record_finding", "record_verdict",
                 }, f"unexpected model tool set: {sorted(all_names)}"
-                # item 4 ships 8 of the 13; the union across phases is those 8.
-                # (fs/mft/timeline/memory are item 10; this asserts what exists.)
                 # Anthropic tool shape is correct.
                 for tool in triage_tools:
                     assert set(tool) == {"name", "description", "input_schema"}, tool

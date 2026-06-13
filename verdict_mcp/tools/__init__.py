@@ -2,7 +2,7 @@
 
 Loose-artifact + recording tools (checklist item 4, DONE): inventory, evtx,
 registry, execution, yara_scan, artifacts, findings_tools.
-Image-backed tools (checklist item 10): fs, mft, timeline, memory.
+Image-backed tools (checklist item 10, DONE): fs, mft, timeline, memory.
 
 Also the single home of the phase allowlists (spec.md > Architecture
 Overview > Phase tool allowlists) - the orchestrator imports TRIAGE_TOOLS /
@@ -24,14 +24,14 @@ if TYPE_CHECKING:  # import cycle guard: server.py imports this module
 #: sees the control plane.
 ALL_TOOLS: tuple[str, ...] = (
     "evidence_inventory",  # 1   triage only
-    "fs_list",             # 2   (item 10)
-    "fs_extract",          # 3   (item 10)
-    "mft_query",           # 4   (item 10)
+    "fs_list",             # 2
+    "fs_extract",          # 3
+    "mft_query",           # 4
     "evtx_query",          # 5
     "registry_query",      # 6
     "execution_evidence",  # 7
-    "timeline_query",      # 8   (item 10)
-    "mem_analyze",         # 9   (item 10)
+    "timeline_query",      # 8
+    "mem_analyze",         # 9
     "yara_scan",           # 10
     "read_artifact",       # 11
     "record_finding",      # 12  triage only
@@ -62,19 +62,26 @@ def register_tools(app: "FastMCP", ctx: "AppContext") -> None:
         evtx,
         execution,
         findings_tools,
+        fs,
         inventory,
+        memory,
+        mft,
         registry,
+        timeline,
         yara_scan,
     )
     from verdict_mcp.tools.common import install_rejection_boundary
 
     inventory.register(app, ctx)        # 1
+    fs.register(app, ctx)                 # 2-3
+    mft.register(app, ctx)                # 4
     evtx.register(app, ctx)             # 5
     registry.register(app, ctx)         # 6
     execution.register(app, ctx)        # 7
+    timeline.register(app, ctx)         # 8
+    memory.register(app, ctx)           # 9
     yara_scan.register(app, ctx)        # 10
     artifacts.register(app, ctx)        # 11
     findings_tools.register(app, ctx)   # 12-13
-    # item 10 registers here: fs (2-3), mft (4), timeline (8), memory (9)
 
     install_rejection_boundary(app, ctx)

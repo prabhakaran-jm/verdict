@@ -73,7 +73,7 @@
   Acceptance: `prd.md > Investigation Report` — citations click through to ledger entries offline; refuted-to-appendix policy holds; `prd.md > Failure & Empty-Case Behavior` — clean case yields a valid, complete, zero-findings report.
   Verify: Open `report.html` from the smoke run in a browser with networking irrelevant — click a citation and land on the ledger entry; confirm `report.pdf` exists; run the clean case and read an honest empty report with zero invented findings.
 
-- [ ] **10. Image-backed tools (5 of 13)**
+- [x] **10. Image-backed tools (5 of 13)**
   Spec ref: `spec.md > MCP Server > Tool definitions` (#2 `fs_list`, #3 `fs_extract`, #4 `mft_query`, #8 `timeline_query`, #9 `mem_analyze`)
   What to build: The five tools that operate on disk images and memory captures: `fs_list`/`fs_extract` via Sleuth Kit `fls`/`icat` (E01 via libewf, no mounting); `mft_query` via MFTECmd or `fls -m` fallback per the item-2 gate; `timeline_query` via `fls -m` → `mactime` with required time window, bodyfile built once per image and cached in `bodyfile/`; `mem_analyze` with the server-enforced Vol3 plugin allowlist (pslist, pstree, psscan, netscan, malfind, cmdline, dlllist, handles). All through runner/pathguard/ledger.
   Acceptance: `prd.md > Constrained Tooling` — full kill-chain tool coverage now complete (all 13 model-visible tools); narrowing params required on every large-data tool; arbitrary Vol3 plugin names rejected.
