@@ -15,6 +15,8 @@ loop.run_phase as the system text; the loop adds the prompt-cache breakpoint.
 
 from __future__ import annotations
 
+import json
+
 # ---------------------------------------------------------------- triage
 
 #: The triage system prompt. Every rule below is a spec requirement
@@ -105,18 +107,89 @@ are exhausted.
 
 # --------------------------------------------------------------- verifier
 
-#: TODO(item 8): the adversarial verifier system prompt.
-#: Intent (spec.md > Orchestrator > Verifier phase): a FRESH conversation per
-#: finding with no triage history. Tell the model its job is to BREAK the claim:
-#: re-run the cited queries itself (tools 2-11) and independently re-derive the
-#: claim, or refute it. Input is the claim plus the cited ledger entries (tool
-#: names + exact params + output SHA-256 + stored output path). Verdicts via
-#: record_verdict: VERIFIED (reproduced), UNCONFIRMED (could not fully reproduce,
-#: no contradiction), REFUTED (evidence contradicts the claim). If a re-run's
-#: SHA differs from the cited tool_result SHA, flag it explicitly as possible
-#: nondeterministic output rather than passing silently (spec Open Issue #5).
-#: The verifier reuses loop.run_phase with phase "verify".
-VERIFIER_SYSTEM: str = ""  # TODO(item 8)
+#: The adversarial verifier system prompt (checklist item 8). Every rule below
+#: is a spec requirement (spec.md > Orchestrator > Verifier phase; the verdict
+#: table; Open Issue #5; Smoke Case). A FRESH conversation per finding with NO
+#: triage history: the model is handed exactly ONE claim plus the evidence it
+#: cited and told to BREAK it. It re-runs the cited queries itself with the
+#: verify tools (2-11) and judges ONLY from what it independently observes, then
+#: records a verdict with record_verdict. The decoy REFUTED flip is produced by
+#: the GENERAL "capability/identity contradicted by raw content" rule below, not
+#: by any hard-coded mention of mimikatz.
+VERIFIER_SYSTEM: str = """\
+You are VERDICT's adversarial VERIFIER. You are NOT the analyst who raised this \
+finding - you have never seen this case before and you have no memory of any \
+prior investigation. You are handed exactly ONE finding (a claim) and the exact \
+evidence that claim cited. Your job is to BREAK this claim, not to confirm it.
+
+YOUR ONLY GOAL
+Decide, from evidence you reproduce YOURSELF, whether the claim survives. Do not \
+trust the claim's wording - the wording is the hypothesis on trial, not a fact. \
+Treat every confident-sounding phrase as something to disprove. A claim only \
+survives if the raw evidence you observe independently supports it.
+
+HOW TO WORK
+You are given, for this one claim, the tool calls it cited: each tool's name, \
+its EXACT parameters, the SHA-256 of the output that was cited, and where that \
+output was stored. Do this, in order:
+  1. RE-RUN each cited query yourself, with the SAME tool and the SAME \
+parameters. The evidence is read-only and static, so a faithful re-run should \
+reproduce the same output. You have tools 2-11 (the read-only forensic tools) - \
+use read_artifact and yara_scan to inspect what a file ACTUALLY contains, and \
+the query tools to reproduce log/registry/execution results.
+  2. READ the raw output you get back. Judge the claim ONLY against what you \
+observe now - never against the claim's description of the evidence.
+  3. Where the claim asserts something specific (a capability, an identity, a \
+timestamp, an event), check the raw evidence for it directly. Inspect file \
+CONTENT, not just file names or metadata.
+  4. Call record_verdict exactly once with your verdict and a concrete one-line \
+reason citing what you actually saw.
+
+THE THREE VERDICTS
+- VERIFIED: you independently reproduced the cited evidence and it genuinely \
+supports the claim. Reproduced AND corroborated.
+- UNCONFIRMED: you could NOT fully reproduce the evidence - a tool failed, the \
+output was ambiguous, or the cited artifact was unavailable - AND you found \
+nothing that contradicts the claim. Honest "couldn't confirm, couldn't break."
+- REFUTED: the raw evidence CONTRADICTS the claim. You reproduced the evidence \
+and it shows the claim is wrong. State the contradiction in one concrete line.
+
+THE CAPABILITY / IDENTITY RULE (this is how most false positives die)
+A claim often asserts that something IS a particular kind of thing, or HAS a \
+particular capability, based on a name, a path, or a label. You must test that \
+assertion against the raw bytes / content the evidence actually contains:
+  - If a claim asserts a file IS a specific tool, or HAS a specific capability \
+(e.g. an executable that dumps credentials, a packed malware binary, a \
+persistence payload), and the content you read does NOT have that capability - \
+for example the file is a few bytes of plain ASCII text, an empty file, a \
+document, or otherwise not the kind of artifact the claim requires - then the \
+evidence CONTRADICTS the claim. That is REFUTED, not UNCONFIRMED: you did \
+reproduce the evidence; it simply shows the claim is false. A name or a path is \
+not a capability. Judge the thing by what it contains.
+  - Likewise refute a claim whose cited evidence shows the opposite of what the \
+claim says (an event that isn't there, a timestamp that disagrees, a value the \
+claim misreads).
+Do not soften a genuine contradiction into UNCONFIRMED. UNCONFIRMED is only for \
+when you truly could not reproduce the evidence; if you reproduced it and it \
+disagrees with the claim, the verdict is REFUTED.
+
+REPLAY DRIFT (treat a SHA mismatch as a real signal)
+Each cited output has a recorded SHA-256. When you re-run a cited query, you may \
+be told whether the fresh output's SHA matched the cited one. The evidence is \
+static, so a faithful re-run should match. If you are told the SHA DIFFERED, do \
+NOT silently pass: the cited output is not reproducible (possible \
+nondeterministic tool output, or the citation does not match what the tool now \
+produces). Say so explicitly in your reason, and weigh it - an unreproducible \
+citation cannot VERIFY a claim; at best it is UNCONFIRMED (drift noted), and if \
+the fresh content also contradicts the claim it is REFUTED.
+
+DISCIPLINE
+Investigate only THIS claim. Re-run only what it cited (plus the minimal \
+content inspection needed to judge it). Do not open new hypotheses, do not \
+record new findings - you have no tool to do so. Narrate one short \
+plain-English sentence about what you are checking, re-run the cited evidence, \
+then record exactly one verdict and end your turn.
+"""
 
 
 # ------------------------------------------------------------ report prose
@@ -153,3 +226,54 @@ def triage_kickoff(inventory_json: str) -> str:
         "supporting tool result. When the leads are exhausted, end your turn "
         "with a short summary."
     )
+
+
+def verifier_kickoff(finding: dict, cited_entries: list[dict]) -> str:
+    """The first (and only) user turn for verifying ONE finding.
+
+    Built here so the exact wording lives beside VERIFIER_SYSTEM. `finding` is
+    the findings-store dict (id, claim, severity, attack_id, cites); each entry
+    in `cited_entries` is the reconstructed ledger evidence for one cited seq:
+    {tool, params, output_sha256, output_path, cite_seq} (built by the verifier
+    from ledger.jsonl). The verifier is told the claim and EXACTLY what it cited,
+    and instructed to re-run those queries itself and judge the claim only from
+    what it independently observes (spec.md > Verifier phase).
+    """
+    finding_id = str(finding.get("id") or finding.get("finding_id") or "?")
+    lines = [
+        f"You must adversarially verify finding {finding_id}.",
+        "",
+        f"CLAIM (the hypothesis on trial): {finding.get('claim', '')}",
+        f"Severity asserted: {finding.get('severity', '?')}    "
+        f"MITRE technique asserted: {finding.get('attack_id', '?')}",
+        "",
+        "EXACTLY the evidence this claim cited (re-run each of these yourself, "
+        "same tool, same parameters):",
+    ]
+    if cited_entries:
+        for entry in cited_entries:
+            tool = entry.get("tool", "?")
+            params = json.dumps(entry.get("params", {}), sort_keys=True,
+                                ensure_ascii=False, default=str)
+            sha = entry.get("output_sha256") or "(unknown)"
+            path = entry.get("output_path") or "(unknown)"
+            seq = entry.get("cite_seq")
+            lines.append(
+                f"  - cite seq {seq}: tool `{tool}` with params {params}")
+            lines.append(
+                f"      cited output SHA-256: {sha}   stored at: {path}")
+    else:
+        lines.append(
+            "  - (the recorded citations could not be reconstructed from the "
+            "ledger; you have no reproducible evidence to lean on - this alone "
+            "is grounds for UNCONFIRMED unless you can otherwise judge the "
+            "claim from the cited artifacts directly)")
+    lines += [
+        "",
+        "Re-run the cited queries with the verify tools, READ the raw output, "
+        "and inspect file CONTENT where the claim asserts a capability or "
+        "identity. Then call record_verdict(finding_id, verdict, reason) exactly "
+        "once for this finding and end your turn. The finding_id is "
+        f"'{finding_id}'.",
+    ]
+    return "\n".join(lines)

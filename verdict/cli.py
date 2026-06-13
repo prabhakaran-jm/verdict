@@ -33,6 +33,7 @@ import typer
 
 from verdict.agent.loop import DEFAULT_EFFORT, LoopConfig, LoopInterrupted
 from verdict.agent.triage import run_triage
+from verdict.agent.verifier import run_verifier
 from verdict.budget import BudgetGuard
 from verdict.findings import FindingsStore
 from verdict.mcp_client import MCPClient
@@ -275,14 +276,29 @@ async def _run_investigation(
         finally:
             ui.update_status(cost_usd=budget_guard.total_cost)
 
-        # ---------------------------------------------------------------
-        # VERIFIER PASS GOES HERE (item 8)
-        #   Fresh-context per-finding adversarial pass over findings_store, set
-        #   phase "verify", reuse loop.run_phase with VERIFIER_SYSTEM and the
-        #   verify sub-budget (budget_guard.verify_cap()). Each verdict ->
-        #   findings_store.set_verdict(...) + ui.verdict_flip(...). The loop,
-        #   budget guard, findings store, and prompts seam are all ready.
-        # ---------------------------------------------------------------
+        # --- VERIFIER PASS (item 8): fresh-context per-finding adversarial
+        #     self-check. Set phase "verify", reuse loop.run_phase with
+        #     VERIFIER_SYSTEM under the verify sub-budget (verify_cap). Each
+        #     verdict -> findings_store.set_verdict + ui.verdict_flip live; the
+        #     decoy flips REFUTED. A sustained API outage here still surfaces
+        #     LoopInterrupted (per-finding errors degrade to UNCONFIRMED inside
+        #     run_verifier) -> partial report + exit 2, mirroring triage.
+        try:
+            await run_verifier(
+                anthropic_client, client,
+                run_dir=run_dir,
+                budget_guard=budget_guard,
+                findings_store=findings_store,
+                terminal_ui=ui,
+                config=config,
+            )
+        except LoopInterrupted as exc:
+            await _safe_log_event(client, "run_interrupted",
+                                  {"reason": str(exc)})
+            ui.narration(f"INTERRUPTED: {exc}")
+            raise
+        finally:
+            ui.update_status(cost_usd=budget_guard.total_cost)
 
         # ---------------------------------------------------------------
         # REPORT GENERATION GOES HERE (item 9)
