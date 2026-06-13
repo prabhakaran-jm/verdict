@@ -61,7 +61,7 @@
   Acceptance: `prd.md > Autonomous Investigation Run` — zero human input start to finish; narrated hypotheses; live cost ticker; budget guard demonstrably caps spend. Triage records ≥2 findings on the smoke case including the decoy (recall-oriented — verification comes next item).
   Verify: Watch `verdict investigate ./cases/smoke/` run end-to-end with zero interaction; confirm narration + one-line-per-tool-call + status bar; open `findings.json` and `ledger.jsonl` — findings cite real seq numbers; total cost on screen ≈ pennies. **← VERIFICATION CHECKPOINT 3**
 
-- [ ] **8. Verifier pass — the REFUTED flip**
+- [x] **8. Verifier pass — the REFUTED flip**
   Spec ref: `spec.md > Orchestrator > Verifier phase (agent/verifier.py)` + `spec.md > Architecture Overview > Phase tool allowlists`
   What to build: Per-finding fresh-context adversarial pass: input = claim + cited ledger entries (tool, exact params, output SHA-256, stored output path); restricted toolset (tools 2–11 + `record_verdict`; no `record_finding`, no `evidence_inventory`); verifier re-runs cited queries and must independently re-derive the claim; verdicts `VERIFIED`/`UNCONFIRMED`/`REFUTED` flip live on the terminal with one-line reasons; SHA drift between re-run and cited output flagged explicitly (spec Open Issue #5). Refuted findings retained for the report appendix.
   Acceptance: `prd.md > Self-Verification` — every finding gets a verdict; smoke decoy (`mimikatz.exe` = ASCII text) reliably flips to `REFUTED` with the reason printed; refuted findings excluded from the headline set.
