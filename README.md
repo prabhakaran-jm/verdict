@@ -118,7 +118,7 @@ Outputs under `runs/<UTC-timestamp>/`:
 - `ledger.jsonl` — append-only audit trail (submission execution log)
 - `artifacts/` — files extracted from disk images during the run
 
-Accuracy vs published ground truth: **`docs/accuracy-report.md`** (after item 11 scoring).
+Accuracy vs published ground truth: **`docs/accuracy-report.md`** — 39.6% recall at 100% precision (zero hallucinated findings), every miss named.
 
 ---
 
@@ -175,11 +175,10 @@ run folder is created.
 | [`docs/scope.md`](docs/scope.md) | Hackathon scope and differentiation |
 | [`docs/prd.md`](docs/prd.md) | Product requirements |
 | [`docs/spec.md`](docs/spec.md) | Technical specification |
-| [`docs/checklist.md`](docs/checklist.md) | Build checklist |
 | [`docs/dataset.md`](docs/dataset.md) | Smoke + Szechuan dataset provenance |
 | [`docs/ground-truth.md`](docs/ground-truth.md) | 24 scorable facts for accuracy |
-| [`docs/accuracy-report.md`](docs/accuracy-report.md) | Self-assessment vs ground truth (fill after final run) |
-| [`docs/execution-logs/`](docs/execution-logs/) | Submission ledger + transcript (copy after final run) |
+| [`docs/accuracy-report.md`](docs/accuracy-report.md) | Self-assessment vs ground truth — 39.6% recall, 100% precision, named misses |
+| [`docs/execution-logs/`](docs/execution-logs/) | Submission ledgers + transcripts (both Szechuan runs + smoke) |
 | [`docs/devpost-story.md`](docs/devpost-story.md) | Submission narrative (paste into Devpost) |
 
 ## License
