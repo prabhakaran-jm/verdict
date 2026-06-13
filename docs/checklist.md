@@ -67,7 +67,7 @@
   Acceptance: `prd.md > Self-Verification` — every finding gets a verdict; smoke decoy (`mimikatz.exe` = ASCII text) reliably flips to `REFUTED` with the reason printed; refuted findings excluded from the headline set.
   Verify: Run the smoke case end-to-end and watch the decoy flip to `REFUTED` on the terminal — the wow moment, on demand. Re-run once to confirm reproducibility; confirm `verdict_recorded` ledger lines.
 
-- [ ] **9. Report generator + clean-case honest-empty test**
+- [x] **9. Report generator + clean-case honest-empty test**
   Spec ref: `spec.md > Orchestrator > Report generator (report/)` + `spec.md > Smoke Case > Clean case (cases/clean/)`
   What to build: Jinja2 → one self-contained `report.html` (inline CSS, no JS, anchors only) with all eight spec sections: header · 5–8 sentence executive summary · chronological attack narrative footnoted to findings · severity-coded findings table (`VERIFIED`+`UNCONFIRMED` only) · per-finding detail with artifact excerpts and clickable anchors into the embedded ledger rendering · Appendix A refuted-with-refutations · Appendix B/C evidence inventory + full tool-call index · Appendix D methodology/constraints. Summary+narrative prose = one Sonnet call over verified findings (report sub-budget). PDF attempt chain: `chromium --headless --print-to-pdf` → `wkhtmltopdf` → manual fallback noted. Then run `cases/clean/` end-to-end.
   Acceptance: `prd.md > Investigation Report` — citations click through to ledger entries offline; refuted-to-appendix policy holds; `prd.md > Failure & Empty-Case Behavior` — clean case yields a valid, complete, zero-findings report.
