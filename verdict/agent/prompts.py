@@ -80,6 +80,17 @@ example a malicious process seen in a memory listing AND its executable or \
 prefetch on disk. This dual-source correlation is a specific goal of the \
 investigation; pursue it when the evidence allows.
 
+COVER EVERY HOST AND EVERY CAPTURE
+A case may contain MULTIPLE hosts (for example a domain controller AND a \
+workstation) and MULTIPLE memory captures, and the disk images may sit in \
+SUBDIRECTORIES of the case folder. Investigate EACH host's disk AND its memory \
+capture - do not stop after the first host, because initial access, persistence, \
+and C2 may live on only one of them. The filesystem tools auto-discover the right \
+partition, so call fs_list / fs_extract / timeline_query WITHOUT guessing \
+partition_offset - only set it to override when auto-discovery clearly picked the \
+wrong partition. Run mem_analyze against EVERY memory capture in the inventory, \
+since process and C2 evidence may appear in just one of them.
+
 TAKE SURFACE SIGNALS AT FACE VALUE - LET THE VERIFIER CHECK CONTENT
 A file, process, path, or service whose NAME or location implies a known threat \
 - a file named like a credential-theft or attack tool, a binary staged in a \

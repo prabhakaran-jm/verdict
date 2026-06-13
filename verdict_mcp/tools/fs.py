@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Annotated, Any
 from pydantic import Field
 
 from verdict_mcp.tools._image_helpers import (
+    discover_partition_offset,
     fls_runner_args,
     parse_fls_listing,
     parse_ifind_inode,
@@ -29,9 +30,24 @@ from verdict_mcp.tools._image_helpers import (
 from verdict_mcp.tools.common import cap_items, clean_params, require_file
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from mcp.server.fastmcp import FastMCP
 
     from verdict_mcp.server import AppContext
+
+
+def _resolve_offset(ctx: "AppContext", image_path: "Path",
+                    partition_offset: int | None) -> tuple[int | None, bool]:
+    """Decide the partition offset for an fls/icat/ifind invocation.
+
+    Explicit `partition_offset` (not None) is honored verbatim — the model can
+    still force a partition. When None, probe mmls once (cached) to auto-target
+    the main Windows/NTFS partition on a multi-partition disk. Returns
+    (offset, auto) where `auto` is True iff the offset came from discovery."""
+    if partition_offset is not None:
+        return partition_offset, False
+    return discover_partition_offset(ctx, image_path), True
 
 
 def register(app: "FastMCP", ctx: "AppContext") -> None:
@@ -56,12 +72,13 @@ def register(app: "FastMCP", ctx: "AppContext") -> None:
         image_path = require_file(
             ctx.pathguard.resolve_read(image, "image"), "image")
         require_disk_image(image_path, "image")
+        offset, auto = _resolve_offset(ctx, image_path, partition_offset)
         params = clean_params(image=image, path=path,
                               partition_offset=partition_offset,
                               recursive=recursive)
 
         run = ctx.runner.run_tool(
-            "fs", fls_runner_args(image_path, partition_offset=partition_offset,
+            "fs", fls_runner_args(image_path, partition_offset=offset,
                                   recursive=recursive),
             tool="fs_list", params=params, ext="txt", component="fls",
         )
@@ -79,6 +96,8 @@ def register(app: "FastMCP", ctx: "AppContext") -> None:
             "returned": len(kept),
             "entries": kept,
             "truncated": capped or len(kept) < len(entries),
+            "partition_offset": offset,
+            "partition_offset_auto": auto,
             "excerpt": run.excerpt,
             "output_path": run.output_rel,
             "output_sha256": run.output_sha256,
@@ -104,14 +123,15 @@ def register(app: "FastMCP", ctx: "AppContext") -> None:
         image_path = require_file(
             ctx.pathguard.resolve_read(image, "image"), "image")
         require_disk_image(image_path, "image")
+        offset, auto = _resolve_offset(ctx, image_path, partition_offset)
         params = clean_params(image=image, target=target,
                               partition_offset=partition_offset)
 
         inode = target.strip()
         if not inode.isdigit():
             ifind_args: list[str | Path] = ["-p", target]
-            if partition_offset is not None:
-                ifind_args = ["-o", str(partition_offset), *ifind_args]
+            if offset is not None:
+                ifind_args = ["-o", str(offset), *ifind_args]
             ifind_args.append(image_path)
             find = ctx.runner.run_tool(
                 "fs", ifind_args, tool="fs_extract", params=params,
@@ -123,8 +143,8 @@ def register(app: "FastMCP", ctx: "AppContext") -> None:
                 encoding="utf-8", errors="replace"))
 
         icat_args: list[str | Path] = []
-        if partition_offset is not None:
-            icat_args.extend(["-o", str(partition_offset)])
+        if offset is not None:
+            icat_args.extend(["-o", str(offset)])
         icat_args.extend([image_path, inode])
         run = ctx.runner.run_tool(
             "fs", icat_args, tool="fs_extract", params=params,
@@ -144,6 +164,8 @@ def register(app: "FastMCP", ctx: "AppContext") -> None:
             "image": image,
             "target": target,
             "inode": inode,
+            "partition_offset": offset,
+            "partition_offset_auto": auto,
             "artifact_path": artifact_rel,
             "artifact_sha256": hashlib.sha256(data).hexdigest(),
             "bytes": len(data),

@@ -39,10 +39,22 @@ BODYFILE = "\n".join([
 STUB_FS = r'''
 import sys
 args = sys.argv[1:]
-# ifind: -p <path> <image>
-if len(args) >= 2 and args[0] == "-p" and args[1].startswith("/"):
+# mmls: <image>  (single positional arg, no flags) -> multi-partition table
+if len(args) == 1 and not str(args[0]).isdigit():
+    print("DOS Partition Table")
+    print("Offset Sector: 0")
+    print("Units are in 512-byte sectors")
+    print("")
+    print("      Slot      Start        End          Length       Description")
+    print("000:  Meta      0000000000   0000000000   0000000001   Primary Table (#0)")
+    print("001:  -------   0000000000   0000002047   0000002048   Unallocated")
+    print("002:  000:000   0000002048   0000718847   0000716800   NTFS / exFAT (0x07)")
+    print("003:  000:001   0000718848   0023590911   0022872064   NTFS / exFAT (0x07)")
+    sys.exit(0)
+# ifind: [-o N] -p <path> <image>  (-p is immediately followed by a /path)
+if "-p" in args and args[args.index("-p") + 1].startswith("/"):
     print("12345")
-# icat: <image> <inode>
+# icat: [-o N] <image> <inode>
 elif len(args) >= 2 and str(args[-1]).isdigit():
     sys.stdout.buffer.write(b"MZ" + b"\x00" * 64)
 # fls
@@ -156,12 +168,61 @@ def expect_rejected(tool: str, args: dict, fragment: str) -> None:
     assert rejected, f"no tool_rejected ledger line for {tool}"
 
 
+def check_discover_offset() -> None:
+    from verdict_mcp.tools._image_helpers import (
+        _parse_mmls_offset,
+        discover_partition_offset,
+    )
+
+    table = "\n".join([
+        "DOS Partition Table",
+        "Units are in 512-byte sectors",
+        "      Slot      Start        End          Length       Description",
+        "000:  Meta      0000000000   0000000000   0000000001   Primary Table (#0)",
+        "001:  -------   0000000000   0000002047   0000002048   Unallocated",
+        "002:  000:000   0000002048   0000718847   0000716800   NTFS / exFAT (0x07)",
+        "003:  000:001   0000718848   0023590911   0022872064   NTFS / exFAT (0x07)",
+    ])
+    # Largest-NTFS Start sector wins (22872064 > 716800 -> 718848).
+    assert _parse_mmls_offset(table) == 718848, _parse_mmls_offset(table)
+    # No NTFS rows -> None.
+    assert _parse_mmls_offset("DOS Partition Table\n000:  Meta  0  0  1  unalloc") is None
+    # Single partition at 2048 -> None (not a multi-partition disk).
+    assert _parse_mmls_offset(
+        "000:  000:000   0000002048   0000010000   0000007953   NTFS (0x07)") is None
+
+    image_path = ENV.case / "desktop.dd"
+    off = discover_partition_offset(ENV.ctx, image_path)
+    assert off == 718848, off
+    # Cached: a second call returns the same value without re-probing.
+    assert discover_partition_offset(ENV.ctx, image_path) == 718848
+
+
 def check_fs_list() -> None:
     since = len(read_ledger())
     out = call("fs_list", {"image": "desktop.dd", "path": "/", "recursive": False})
     assert not out.get("is_error"), out
     assert out["returned"] >= 1
+    # partition_offset=None -> auto-discovered the largest-NTFS partition.
+    assert out["partition_offset"] == 718848, out
+    assert out["partition_offset_auto"] is True
     assert_pair("fs_list", out, since)
+    # The fls invocation received `-o 718848` (the discovered offset). The last
+    # tool_called for fs_list in this window is the real fls listing, after the
+    # mmls probe; its recorded argv must carry the discovered offset.
+    called = [l for l in read_ledger()[since:]
+              if l["event"] == "tool_called" and l["tool"] == "fs_list"]
+    fls_argv = [str(a) for a in called[-1]["argv"]]
+    assert "-o" in fls_argv and "718848" in fls_argv, fls_argv
+
+
+def check_fs_list_explicit_offset() -> None:
+    out = call("fs_list", {
+        "image": "desktop.dd", "path": "/", "partition_offset": 239616})
+    assert not out.get("is_error"), out
+    # Explicit offset passed through unchanged; no auto-discovery.
+    assert out["partition_offset"] == 239616, out
+    assert out["partition_offset_auto"] is False
 
 
 def check_fs_extract_path() -> None:
@@ -247,7 +308,11 @@ def check_rejections() -> None:
 def main() -> int:
     global ENV
     checks = [
+        ("discover_partition_offset: parse + pick largest NTFS + cache",
+         check_discover_offset),
         ("fs_list: listing + ledger pair", check_fs_list),
+        ("fs_list: explicit partition_offset passthrough",
+         check_fs_list_explicit_offset),
         ("fs_extract: path target -> artifacts/", check_fs_extract_path),
         ("fs_extract: inode target", check_fs_extract_inode),
         ("mft_query: bodyfile fallback filter", check_mft_bodyfile),

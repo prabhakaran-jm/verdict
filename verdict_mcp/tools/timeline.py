@@ -17,12 +17,15 @@ from pydantic import Field
 
 from verdict_mcp.tools._image_helpers import (
     bodyfile_cache_path,
+    discover_partition_offset,
     parse_mactime,
     require_disk_image,
 )
 from verdict_mcp.tools.common import Rejection, cap_items, clean_params, require_file
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from mcp.server.fastmcp import FastMCP
 
     from verdict_mcp.server import AppContext
@@ -61,16 +64,20 @@ def register(app: "FastMCP", ctx: "AppContext") -> None:
         image_path = require_file(
             ctx.pathguard.resolve_read(image, "image"), "image")
         require_disk_image(image_path, "image")
+        if partition_offset is not None:
+            offset, auto = partition_offset, False
+        else:
+            offset, auto = discover_partition_offset(ctx, image_path), True
         params = clean_params(image=image, after=after, before=before,
                               keyword=keyword,
                               partition_offset=partition_offset)
 
-        cache = bodyfile_cache_path(ctx.run_dir, image_path, partition_offset)
+        cache = bodyfile_cache_path(ctx.run_dir, image_path, offset)
         if not cache.is_file():
             cache.parent.mkdir(parents=True, exist_ok=True)
             fls_args: list[str | Path] = ["-r", "-m", "/"]
-            if partition_offset is not None:
-                fls_args = ["-o", str(partition_offset), *fls_args]
+            if offset is not None:
+                fls_args = ["-o", str(offset), *fls_args]
             fls_args.append(image_path)
             build = ctx.runner.run_tool(
                 "timeline", fls_args, tool="timeline_query", params=params,
@@ -100,6 +107,8 @@ def register(app: "FastMCP", ctx: "AppContext") -> None:
             "after": after.isoformat(),
             "before": before.isoformat(),
             "bodyfile": cache.relative_to(ctx.run_dir).as_posix(),
+            "partition_offset": offset,
+            "partition_offset_auto": auto,
             "total_matches": len(matches),
             "returned": len(kept),
             "entries": kept,

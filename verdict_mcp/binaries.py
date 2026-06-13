@@ -171,6 +171,7 @@ _FLS = _exe("fls", ("fls",), ("-V",), expect="sleuth kit")
 _ICAT = _exe("icat", ("icat",), ("-V",), expect="sleuth kit")
 _IFIND = _exe("ifind", ("ifind",), ("-V",), expect="sleuth kit")
 _MACTIME = _exe("mactime", ("mactime",), ("-V",), expect="sleuth kit")
+_MMLS = _exe("mmls", ("mmls",), ("-V",), expect="sleuth kit")
 _RIP = _exe("rip.pl", ("rip.pl", "rip", "regripper"), (), expect="rip")
 
 CAPABILITIES: tuple[Capability, ...] = (
@@ -179,9 +180,10 @@ CAPABILITIES: tuple[Capability, ...] = (
         title="Filesystem / extract",
         primary=Tier(
             name="primary",
-            description="Sleuth Kit (fls, icat, mactime)",
+            description="Sleuth Kit (fls, icat, mactime, mmls)",
             groups=(Group("fls", (_FLS,)), Group("icat", (_ICAT,)),
-                    Group("ifind", (_IFIND,)), Group("mactime", (_MACTIME,))),
+                    Group("ifind", (_IFIND,)), Group("mactime", (_MACTIME,)),
+                    Group("mmls", (_MMLS,))),
             lead="fls",
         ),
         fallback=None,

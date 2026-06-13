@@ -9,9 +9,13 @@ import hashlib
 import re
 from datetime import datetime
 from pathlib import Path, PurePosixPath
+from typing import TYPE_CHECKING
 
 from verdict_mcp.tools.common import Rejection, in_window, parse_event_time
 from verdict_mcp.tools.inventory import classify
+
+if TYPE_CHECKING:
+    from verdict_mcp.server import AppContext
 
 #: Max entries returned from fs_list / timeline / mft (response budget).
 MAX_LIST_ENTRIES = 500
@@ -58,6 +62,91 @@ def fls_runner_args(image: Path, *, partition_offset: int | None,
         args.append("-r")
     args.append(image)
     return args
+
+
+#: Per-resolved-image cache of discovered partition offsets. Keyed by the
+#: absolute image path; value is the chosen Start sector (int) or None when no
+#: multi-partition NTFS layout was found (caller then runs without -o).
+_PARTITION_OFFSET_CACHE: dict[str, int | None] = {}
+
+
+def _parse_mmls_offset(text: str) -> int | None:
+    """Pick the Start sector of the largest NTFS partition in `mmls` output.
+
+    mmls emits a "DOS Partition Table" / "Units are in 512-byte sectors" header
+    then rows like:
+        003:  000:001   0000718848   0023590911   0022872064   NTFS / exFAT (0x07)
+    Column count varies between builds, so we split on whitespace and look for a
+    row that has a numeric Start, a numeric Length, and "NTFS" anywhere in the
+    trailing description. Among those, the row with the LARGEST Length wins (the
+    Windows C: partition dwarfs System Reserved). Returns its Start sector, or
+    None if no qualifying NTFS row exists.
+    """
+    best_start: int | None = None
+    best_length = -1
+    for raw in text.splitlines():
+        line = raw.strip()
+        parts = line.split()
+        if len(parts) < 5:
+            continue
+        # Data rows start with a "NNN:" slot id; skip blank lines + header prose
+        # ("DOS Partition Table", "Units are in 512-byte sectors", column titles).
+        if not parts[0].endswith(":") or not parts[0].rstrip(":").isdigit():
+            continue
+        # Find the description tail and the numeric Start/Length columns. The
+        # last three numeric-looking columns before the description are
+        # Start, End, Length; we locate Start as the first all-digit token and
+        # Length as the third all-digit token following the CHS/slot fields.
+        # Start/End/Length are the 3 all-digit columns before the description;
+        # the slot id ("003:") and CHS fields ("000:001") carry colons so they
+        # are not picked up here.
+        nums: list[tuple[int, int]] = [
+            (idx, int(tok)) for idx, tok in enumerate(parts) if tok.isdigit()
+        ]
+        if len(nums) < 3:
+            continue
+        start = nums[-3][1]
+        length = nums[-1][1]
+        desc_start = nums[-1][0] + 1
+        description = " ".join(parts[desc_start:])
+        if "ntfs" not in description.lower():
+            continue
+        if length > best_length:
+            best_length = length
+            best_start = start
+    # A single partition starting at 0 or 2048 is not a multi-partition disk;
+    # treat tiny/degenerate layouts as "no override needed".
+    if best_start is not None and best_start <= 2048:
+        return None
+    return best_start
+
+
+def discover_partition_offset(ctx: "AppContext", image_path: Path) -> int | None:
+    """Probe `image_path` with mmls and return the main NTFS Start sector.
+
+    Runs `mmls` through the runner (so the probe is ledgered for audit), parses
+    its output, and caches the result per absolute image path so repeated
+    fs_list/fs_extract/timeline calls don't re-probe. Returns None when mmls
+    fails, emits no NTFS rows, or shows a single partition at 0/2048 (caller then
+    runs without -o, the prior behavior)."""
+    key = str(image_path.resolve())
+    if key in _PARTITION_OFFSET_CACHE:
+        return _PARTITION_OFFSET_CACHE[key]
+    offset: int | None = None
+    try:
+        run = ctx.runner.run_tool(
+            "fs", [image_path], tool="fs_list",
+            params={"probe": "mmls", "image": image_path.name},
+            ext="txt", component="mmls",
+        )
+        if not run.is_error:
+            text = run.output_path.read_text(encoding="utf-8", errors="replace")
+            offset = _parse_mmls_offset(text)
+    except Exception:
+        # mmls unavailable / unresolvable: fall back to no-offset behavior.
+        offset = None
+    _PARTITION_OFFSET_CACHE[key] = offset
+    return offset
 
 
 def bodyfile_cache_path(run_dir: Path, image: Path,
