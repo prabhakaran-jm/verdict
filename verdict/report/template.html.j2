@@ -1,16 +1,283 @@
 <!DOCTYPE html>
-{# VERDICT report template - filled in by checklist item 9.
-   Spec ref: spec.md > Orchestrator > Report generator (report/).
-   Must stay a single self-contained file: inline CSS, no JS, anchors only,
-   citations jump into the embedded ledger rendering. #}
+{# VERDICT report template - checklist item 9.
+   Spec ref: spec.md > Orchestrator > Report generator (report/);
+             spec.md > Data Flow - Lifecycle of a Finding.
+   A single self-contained file: inline CSS only, NO <script>, NO external
+   <link>, anchors only. Citations are <a href="#ledger-<seq>"> that jump into
+   the embedded ledger rendering (Appendix C), where each tool_result line
+   carries id="ledger-<seq>". Opens offline, nothing to run. #}
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>VERDICT report - {{ case_name | default("(case)") }}</title>
-  <style>/* TODO(item 9): inline CSS, severity colors, print-friendly layout */</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VERDICT report - {{ case_name }}</title>
+  <style>
+    :root {
+      --critical: #b91c1c; --high: #c2410c; --medium: #b45309; --low: #0e7490;
+      --verified: #15803d; --unconfirmed: #b45309; --refuted: #b91c1c;
+      --ink: #1f2933; --muted: #5b6573; --line: #d6dbe1; --bg-soft: #f6f8fa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        Helvetica, Arial, sans-serif;
+      color: var(--ink); line-height: 1.5; margin: 0;
+      padding: 2rem 1.5rem 4rem; max-width: 60rem; margin: 0 auto;
+    }
+    h1 { font-size: 1.7rem; margin: 0 0 .25rem; }
+    h2 {
+      font-size: 1.25rem; margin: 2.25rem 0 .75rem;
+      border-bottom: 2px solid var(--line); padding-bottom: .25rem;
+    }
+    h3 { font-size: 1.05rem; margin: 1.5rem 0 .4rem; }
+    a { color: #1d4ed8; }
+    p { margin: .5rem 0; }
+    code, pre, .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .82rem;
+    }
+    pre {
+      background: var(--bg-soft); border: 1px solid var(--line);
+      border-radius: 4px; padding: .6rem .75rem; overflow-x: auto;
+      white-space: pre-wrap; word-break: break-word; margin: .4rem 0;
+    }
+    .muted { color: var(--muted); }
+    .meta-grid {
+      display: grid; grid-template-columns: max-content 1fr; gap: .25rem 1.25rem;
+      margin: .75rem 0 0; font-size: .95rem;
+    }
+    .meta-grid dt { color: var(--muted); }
+    .meta-grid dd { margin: 0; font-weight: 600; }
+    table { border-collapse: collapse; width: 100%; margin: .75rem 0; font-size: .92rem; }
+    th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { background: var(--bg-soft); font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
+    .sev { font-weight: 700; text-transform: uppercase; font-size: .78rem; letter-spacing: .03em; }
+    .sev-critical { color: var(--critical); }
+    .sev-high { color: var(--high); }
+    .sev-medium { color: var(--medium); }
+    .sev-low { color: var(--low); }
+    .verdict { font-weight: 700; font-size: .8rem; }
+    .verdict-VERIFIED { color: var(--verified); }
+    .verdict-UNCONFIRMED { color: var(--unconfirmed); }
+    .verdict-REFUTED { color: var(--refuted); }
+    .finding { border: 1px solid var(--line); border-radius: 6px; padding: .25rem 1rem 1rem; margin: 1rem 0; }
+    .finding-head { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: baseline; }
+    .excerpt-path { font-size: .8rem; color: var(--muted); margin: .6rem 0 .15rem; }
+    .note { background: #fef9c3; border: 1px solid #fde047; border-radius: 4px; padding: .5rem .75rem; margin: .6rem 0; font-size: .9rem; }
+    .empty { color: var(--muted); font-style: italic; padding: .5rem 0; }
+    .ledger-entry { border-bottom: 1px solid var(--line); padding: .35rem 0; }
+    .ledger-entry:target { background: #fff7d6; outline: 2px solid #fde047; }
+    .ledger-seq { font-weight: 700; color: var(--muted); }
+    sup a { text-decoration: none; }
+    footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .82rem; }
+    @media print {
+      body { padding: 0; max-width: none; }
+      h2 { page-break-after: avoid; }
+      .finding, .ledger-entry { page-break-inside: avoid; }
+    }
+  </style>
 </head>
 <body>
-  <h1>VERDICT - Investigation Report</h1>
-  <p>Template scaffold; the eight report sections are implemented in checklist item 9.</p>
+
+{# ----------------------------------------------------- 1. Header ------- #}
+<header>
+  <h1>VERDICT &mdash; Investigation Report</h1>
+  <p class="muted">Autonomous, self-verified DFIR triage with a server-written audit ledger.</p>
+  <dl class="meta-grid">
+    <dt>Case</dt><dd>{{ case_name }}</dd>
+    <dt>Run ID</dt><dd class="mono">{{ run_id }}</dd>
+    <dt>Wall time</dt><dd>{{ wall_time }}</dd>
+    <dt>Total API cost</dt><dd>${{ "%.4f"|format(total_cost) }}</dd>
+    <dt>Model</dt><dd class="mono">{{ model }}</dd>
+    <dt>Findings</dt><dd>{{ verified_unconfirmed|length }} reported &middot; {{ refuted|length }} refuted</dd>
+  </dl>
+  {% if interrupted %}
+  <div class="note"><strong>Run INTERRUPTED.</strong> This is a partial report written from the findings that existed when the run was interrupted.</div>
+  {% endif %}
+  {% for note in budget_notes %}
+  <div class="note"><strong>Budget guard:</strong> {{ note }}</div>
+  {% endfor %}
+</header>
+
+{# --------------------------------------------- 2. Executive summary ---- #}
+<section>
+  <h2>1. Executive summary</h2>
+  {% if executive_summary %}
+  <p>{{ executive_summary }}</p>
+  {% else %}
+  <p class="empty">No executive summary was produced.</p>
+  {% endif %}
+</section>
+
+{# --------------------------------------------- 3. Attack narrative ----- #}
+<section>
+  <h2>2. Attack narrative</h2>
+  {% if attack_narrative %}
+  <p>
+    {% for s in attack_narrative %}{{ s.text }}{% if s.finding_id %}<sup><a href="#{{ s.finding_id }}">[{{ s.finding_id }}]</a></sup>{% endif %} {% endfor %}
+  </p>
+  {% else %}
+  <p class="empty">No attack narrative &mdash; the evidence examined showed no chain of intrusion to recount.</p>
+  {% endif %}
+</section>
+
+{# --------------------------------------------- 4. Findings table ------- #}
+<section>
+  <h2>3. Findings</h2>
+  <p class="muted">Verified and unconfirmed findings only. Refuted claims are in Appendix A.</p>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Claim</th><th>Severity</th><th>Confidence</th><th>ATT&amp;CK</th><th>Evidence</th></tr>
+    </thead>
+    <tbody>
+    {% for f in verified_unconfirmed %}
+      <tr>
+        <td class="mono"><a href="#{{ f.id }}">{{ f.id }}</a></td>
+        <td>{{ f.claim }}</td>
+        <td class="sev sev-{{ f.severity }}">{{ f.severity }}</td>
+        <td class="verdict verdict-{{ f.verdict }}">{{ f.verdict }}</td>
+        <td class="mono">{{ f.attack_id }}</td>
+        <td>{{ f.cites|length }}</td>
+      </tr>
+    {% endfor %}
+    {% if not verified_unconfirmed %}
+      <tr><td colspan="6" class="empty">No findings &mdash; the evidence was examined and found clean. No indicators of compromise were reported.</td></tr>
+    {% endif %}
+    </tbody>
+  </table>
+</section>
+
+{# --------------------------------------------- 5. Per-finding detail --- #}
+<section>
+  <h2>4. Finding detail</h2>
+  {% if not verified_unconfirmed %}
+  <p class="empty">No reported findings to detail.</p>
+  {% endif %}
+  {% for f in verified_unconfirmed %}
+  <div class="finding" id="{{ f.id }}">
+    <div class="finding-head">
+      <h3 style="margin:.6rem 0 0">{{ f.id }}</h3>
+      <span class="sev sev-{{ f.severity }}">{{ f.severity }}</span>
+      <span class="verdict verdict-{{ f.verdict }}">{{ f.verdict }}</span>
+      <span class="mono muted">{{ f.attack_id }}</span>
+    </div>
+    <p>{{ f.claim }}</p>
+    <h4 style="margin:.6rem 0 .2rem; font-size:.92rem;">Evidence</h4>
+    {% if f.evidence %}
+      {% for e in f.evidence %}
+      <div>
+        <div class="excerpt-path">
+          cite <a href="#ledger-{{ e.cite_seq }}">seq {{ e.cite_seq }}</a>
+          &middot; <span class="mono">{{ e.tool }}</span>
+          {% if e.output_path %}&middot; <span class="mono">{{ e.output_path }}</span>{% endif %}
+        </div>
+        {% if e.excerpt %}<pre>{{ e.excerpt }}</pre>{% else %}<p class="empty">(no excerpt available for this artifact)</p>{% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="empty">No reproducible artifacts were resolved for this finding's citations.</p>
+    {% endif %}
+    <h4 style="margin:.8rem 0 .2rem; font-size:.92rem;">Verifier's reproduction note</h4>
+    <p>{% if f.verdict_reason %}{{ f.verdict_reason }}{% else %}<span class="empty">(no verdict reason recorded)</span>{% endif %}</p>
+  </div>
+  {% endfor %}
+</section>
+
+{# --------------------------------------- 6. Appendix A: refuted -------- #}
+<section>
+  <h2>Appendix A &mdash; Refuted findings</h2>
+  <p class="muted">Triage hypotheses the adversarial verifier reproduced and broke. Their presence here is proof the self-correction fired &mdash; they were kept out of the headline findings above.</p>
+  {% if refuted %}
+    {% for f in refuted %}
+    <div class="finding" id="{{ f.id }}">
+      <div class="finding-head">
+        <h3 style="margin:.6rem 0 0">{{ f.id }}</h3>
+        <span class="sev sev-{{ f.severity }}">{{ f.severity }}</span>
+        <span class="verdict verdict-REFUTED">REFUTED</span>
+        <span class="mono muted">{{ f.attack_id }}</span>
+      </div>
+      <p><strong>Claim (refuted):</strong> {{ f.claim }}</p>
+      <p><strong>Refutation:</strong> {% if f.verdict_reason %}{{ f.verdict_reason }}{% else %}<span class="empty">(no refutation reason recorded)</span>{% endif %}</p>
+      {% if f.cites %}<p class="muted">Cited evidence:
+        {% for seq in f.cites %}<a href="#ledger-{{ seq }}">seq {{ seq }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
+      </p>{% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+    <p class="empty">No findings were refuted in this run.</p>
+  {% endif %}
+</section>
+
+{# ------------------------------ 7. Appendix B: evidence inventory ------ #}
+<section>
+  <h2>Appendix B &mdash; Evidence inventory</h2>
+  {% if inventory %}
+  <table>
+    <thead><tr><th>File</th><th>Type</th><th>Size (bytes)</th><th>SHA-256</th></tr></thead>
+    <tbody>
+    {% for item in inventory %}
+      <tr>
+        <td class="mono">{{ item.path }}</td>
+        <td>{{ item.type }}</td>
+        <td>{{ item.size if item.size is not none else "?" }}</td>
+        <td class="mono" style="word-break:break-all">{{ item.sha256 }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No evidence inventory was recorded for this run.</p>
+  {% endif %}
+</section>
+
+{# ------------------------ 8. Appendix C: tool-call index / ledger ------ #}
+<section>
+  <h2>Appendix C &mdash; Tool-call index (audit ledger)</h2>
+  <p class="muted">Every ledger event, in order. Each tool result is anchored
+    <span class="mono">ledger-&lt;seq&gt;</span> &mdash; the citations above jump here.
+    The ledger is written by the server only (single writer); this is a faithful rendering of <span class="mono">ledger.jsonl</span>.</p>
+  {% for entry in ledger %}
+  <div class="ledger-entry"{% if entry.event == "tool_result" %} id="ledger-{{ entry.seq }}"{% endif %}>
+    <span class="ledger-seq">#{{ entry.seq }}</span>
+    <span class="mono">{{ entry.ts }}</span>
+    <strong>{{ entry.event }}</strong>
+    {% if entry.tool %}<span class="mono">{{ entry.tool }}</span>{% endif %}
+    {% if entry.summary %}<span class="muted">{{ entry.summary }}</span>{% endif %}
+  </div>
+  {% endfor %}
+  {% if not ledger %}<p class="empty">No ledger events were recorded.</p>{% endif %}
+</section>
+
+{# ------------------------ 9. Appendix D: methodology ------------------- #}
+<section>
+  <h2>Appendix D &mdash; Methodology &amp; constraints</h2>
+  <p>This investigation was produced by VERDICT, an autonomous agent whose safety is
+    enforced by architecture, not by prompts. The agent's only actuators are a fixed
+    set of typed, read-only forensic tools placed in its tool list for the current
+    phase. Specifically, by construction:</p>
+  <ul>
+    <li><strong>No shell, no file-write tool.</strong> There is no tool that accepts an arbitrary
+      command string and no tool that writes to evidence &mdash; the harmful capability does not
+      exist in the agent's tool list, so it cannot be enabled by a prompt.</li>
+    <li><strong>Typed, validated parameters.</strong> Every tool call is validated server-side;
+      malformed calls are rejected and recorded in the ledger.</li>
+    <li><strong>Server-side path guard.</strong> Tools may read only from the evidence folder and
+      write only to this run's output folder; any path outside either is refused by the server.</li>
+    <li><strong>Single-writer ledger.</strong> The audit ledger is written exclusively by the
+      server, one fsync'd line per event; the agent has no tool that can write or modify it.</li>
+    <li><strong>Independent verification.</strong> Every reported finding was re-derived by a
+      separate adversarial pass in a fresh context with a restricted toolset, working only from
+      the raw evidence the finding cited. Refuted claims (Appendix A) are kept out of the headline.</li>
+  </ul>
+  <p class="muted">Pcap files, if present, are inventoried and hashed but not parsed (deep packet
+    analysis is out of scope for this run).</p>
+</section>
+
+<footer>
+  Generated by VERDICT &mdash; run <span class="mono">{{ run_id }}</span> &middot;
+  model <span class="mono">{{ model }}</span> &middot; total cost ${{ "%.4f"|format(total_cost) }}.
+  Self-contained HTML: open offline, no server required.
+</footer>
+
 </body>
 </html>
